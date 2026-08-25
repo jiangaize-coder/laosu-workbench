@@ -1,0 +1,45 @@
+{
+  "manifestVersion": 1,
+  "id": "laosu-workbench",
+  "name": "课务台",
+  "version": "0.6.0",
+  "description": "排课、事务、提醒与飞书同步的 Hana 全屏工作台和 Agent 工具。",
+  "minAppVersion": "0.333.0",
+  "trust": "full-access",
+  "capabilities": [
+    "model.sample"
+  ],
+  "ui": {
+    "hostCapabilities": []
+  },
+  "contributes": {
+    "page": {
+      "title": {
+        "zh": "课务台",
+        "en": "Laosu Workbench"
+      },
+      "route": "/page",
+      "icon": "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"><rect x=\"3.5\" y=\"4\" width=\"17\" height=\"16\" rx=\"2\"/><path d=\"M7 2v4M17 2v4M3.5 9h17\"/><path d=\"M7.5 13h3v3h-3zM13.5 13h3v3h-3z\"/></svg>"
+    }
+  },
+  "dev": {
+    "scenarios": [
+      {
+        "id": "dashboard-read",
+        "steps": [
+          {
+            "invokeTool": {
+              "name": "get_dashboard",
+              "input": {
+                "scope": "week"
+              }
+            }
+          },
+          {
+            "expectToolText": "课程"
+          }
+        ]
+      }
+    ]
+  }
+}
