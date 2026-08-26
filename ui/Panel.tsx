@@ -24,7 +24,7 @@ import { addDateDays, buildMonthGridDates, buildWeekDates, buildWeekPageSlots, c
 import { api } from './api-client';
 import { createRequestGate } from './request-gate';
 
-type Tab = 'overview' | 'planning' | 'affairs';
+type Tab = 'overview' | 'cockpit' | 'planning' | 'affairs';
 type Scope = 'today' | 'week' | 'month' | 'horizon';
 
 type TimelineItem = {
@@ -282,6 +282,7 @@ type ActionPreset = {
 
 const tabs: Array<{ id: Tab; label: string }> = [
   { id: 'overview', label: '总览' },
+  { id: 'cockpit', label: '驾驶舱' },
   { id: 'planning', label: '筹备' },
   { id: 'affairs', label: '事务' },
 ];
@@ -454,6 +455,7 @@ function Panel() {
   const contextHistoryRef = useRef(false);
   const scrollPositionsRef = useRef<Record<Tab, number>>({
     overview: Number(window.sessionStorage.getItem('laosu-workbench.scroll.overview') || 0),
+    cockpit: Number(window.sessionStorage.getItem('laosu-workbench.scroll.cockpit') || 0),
     planning: Number(window.sessionStorage.getItem('laosu-workbench.scroll.planning') || 0),
     affairs: Number(window.sessionStorage.getItem('laosu-workbench.scroll.affairs') || 0),
   });
@@ -984,6 +986,7 @@ function Panel() {
             {dashboard && tab === 'overview' && (
               <Overview dashboard={dashboard} pending={activePending} upcoming={upcoming} onInspect={openItemDetail} onOpenDay={openDayDetail} onPrepare={openAction} onRetry={handleAffairRetry} retryingId={quickBusyId} affairFeedback={affairFeedback} onDayComplete={handleDayComplete} dayBusy={dayCompleteBusy} dayFeedback={dayCompleteFeedback} />
             )}
+            {tab === 'cockpit' && <CockpitView onAction={openAction} onAskAi={openAiWithDraft} />}
             {tab === 'planning' && <PlanningView onAction={openAction} onAskAi={openAiWithDraft} refreshKey={planningRevision} scheduleText={dashboard?.scheduleText} onDataChanged={refreshCurrent} />}
             {dashboard && tab === 'affairs' && <AffairsView pending={activePending} affairs={dashboard.affairs} onPrepare={openAction} onInspect={openItemDetail} onRetry={handleAffairRetry} retryingId={quickBusyId} feedback={affairFeedback} />}
           </div>
@@ -1408,6 +1411,136 @@ function MonthCalendar({ items, range, localDate, onOpenDay }: {
             </button>;
           })}
         </div>
+      </div>
+    </div>
+  );
+}
+
+type CockpitData = {
+  ok: boolean;
+  monday: string;
+  localDate: string;
+  days: Array<{
+    date: string;
+    weekday: string;
+    courses: Array<{ title: string; start: string; end: string; duration: number | null; status: string; reservationId: string | null }>;
+    reservations: Array<{ id: string; student: string; start: string; end: string; status: string; zone: string }>;
+    gaps: Array<{ start: number; end: number; minutes: number }>;
+    courseCount: number;
+    reservationCount: number;
+    gapMinutes: number;
+  }>;
+  students: Array<{ name: string; zone: string; group: string }>;
+  diagnostics: { unassigned: string[]; totalMinutes: number; courseCount: number; reservationCount: number; dayGaps: Array<{ date: string; weekday: string; gapMinutes: number }> };
+  warnings: string[];
+};
+
+function minutesToText(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0');
+}
+
+function CockpitView({ onAction, onAskAi }: { onAction: (preset: ActionPreset) => void; onAskAi: (draft: string) => void }) {
+  const [data, setData] = useState<CockpitData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const result = await api<CockpitData>('api/cockpit');
+      setData(result);
+      setError('');
+      return true;
+    } catch (err: any) {
+      setError(err?.message || '读取失败');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  const groups = useMemo(() => {
+    const map = new Map<string, CockpitData['students']>();
+    for (const student of data?.students ?? []) {
+      if (!map.has(student.group)) map.set(student.group, []);
+      map.get(student.group)!.push(student);
+    }
+    const order = ['本周已排', '已预留', '未排'];
+    return order.map((key) => ({ label: key, items: map.get(key) ?? [] }));
+  }, [data]);
+  if (loading && !data) return <div className="view-stack"><p className="muted-note">正在装载驾驶舱…</p></div>;
+  if (error && !data) return <div className="view-stack"><Check label="驾驶舱读取" ok={false} detail={error} /></div>;
+  const today = data?.localDate ?? '';
+  return (
+    <div className="view-stack cockpit-view">
+      <PageTitle eyebrow="排课驾驶舱" title="一周试排" description="左选学生，中看空档与课程，右看诊断。点空档直接开预留。" />
+      <div className="cockpit-toolbar">
+        <span className="muted-note">{data?.monday} 当周 · 今天 {today}</span>
+        <button type="button" className="ghost-button" onClick={() => void load(true)}>刷新</button>
+        <button type="button" className="ghost-button" onClick={() => onAskAi('')}>AI 排课</button>
+      </div>
+      <div className="cockpit-layout">
+        <aside className="cockpit-left panel">
+          <PanelHeading title="候选学生" />
+          {groups.map((group) => (
+            <section key={group.label} className="cockpit-group">
+              <p className="cockpit-group-label">{group.label} · {group.items.length}</p>
+              {group.items.length === 0 ? <p className="muted-note">（无）</p> : group.items.map((student) => (
+                <div key={student.name} className="cockpit-student">
+                  <span>{student.name}</span>
+                  <span className="cockpit-zone">{student.zone}</span>
+                </div>
+              ))}
+            </section>
+          ))}
+        </aside>
+        <section className="cockpit-canvas">
+          {data?.days.map((day) => (
+            <div key={day.date} className={'cockpit-day' + (day.date === today ? ' cockpit-day-today' : '')}>
+              <div className="cockpit-day-head"><strong>{day.weekday}</strong><span className="muted-note">{day.date.slice(5)}</span></div>
+              <div className="cockpit-day-body">
+                {day.courses.map((course, index) => (
+                  <div key={'c' + index} className="cockpit-card cockpit-card-course" role="group">
+                    <button type="button" className="cockpit-card-main" title="点击调整这节课" onClick={() => onAction({ operation: 'course_move', student: course.title, fromDate: day.date, fromTime: String(course.start).slice(11, 16) })}>
+                      <span>{course.title}</span>
+                      <span className="cockpit-card-time">{String(course.start).slice(11, 16)}–{String(course.end).slice(11, 16)}</span>
+                    </button>
+                    <button type="button" className="cockpit-card-ai" title="用一句话交给 AI 调时间" onClick={() => onAskAi('把' + course.title + ' ' + day.date + ' ' + String(course.start).slice(11, 16) + ' 的这节课调一下时间')}>AI</button>
+                  </div>
+                ))}
+                {day.reservations.map((reservation, index) => (
+                  <button key={'r' + index} type="button" className="cockpit-card cockpit-card-reservation" onClick={() => onAction({ operation: 'reservation_update', id: reservation.id, student: reservation.student, date: day.date, time: String(reservation.start).slice(11, 16) })}>
+                    <span>{reservation.student} · 预留</span>
+                    <span className="cockpit-card-time">{String(reservation.start).slice(11, 16)}–{String(reservation.end).slice(11, 16)}</span>
+                  </button>
+                ))}
+                {day.gaps.map((gap, index) => (
+                  <button key={'g' + index} type="button" className="cockpit-gap" title={'空档 ' + gap.minutes + ' 分钟，点击预留'} onClick={() => onAction({ operation: 'reservation_add', date: day.date, time: minutesToText(gap.start) })}>
+                    {minutesToText(gap.start)}–{minutesToText(gap.end)} 空档
+                  </button>
+                ))}
+                {day.courses.length === 0 && day.reservations.length === 0 && <p className="muted-note">无课</p>}
+              </div>
+            </div>
+          ))}
+        </section>
+        <aside className="cockpit-right panel">
+          <PanelHeading title="实时诊断" />
+          <Metric label="本周课程" value={data?.diagnostics.courseCount ?? 0} hint={'共 ' + (data?.diagnostics.totalMinutes ?? 0) + ' 分钟'} tone="sage" />
+          <Metric label="有效预留" value={data?.diagnostics.reservationCount ?? 0} hint="待确认/已确认" tone="amber" />
+          <section className="cockpit-group">
+            <p className="cockpit-group-label">每日空档</p>
+            {data?.diagnostics.dayGaps.map((day) => (
+              <div key={day.date} className="cockpit-student"><span>{day.weekday}</span><span className="cockpit-zone">{day.gapMinutes} 分钟</span></div>
+            ))}
+          </section>
+          <section className="cockpit-group">
+            <p className="cockpit-group-label">尚未排入 · {data?.diagnostics.unassigned.length ?? 0}</p>
+            {data?.diagnostics.unassigned.length ? data?.diagnostics.unassigned.map((name) => <div key={name} className="cockpit-student cockpit-unassigned"><span>{name}</span></div>) : <p className="muted-note">本周在读学生都已排或已预留</p>}
+          </section>
+          {(data?.warnings ?? []).map((warning, index) => <Check key={index} label="读取警告" ok={false} detail={warning} />)}
+        </aside>
       </div>
     </div>
   );
