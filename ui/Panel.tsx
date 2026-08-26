@@ -2645,6 +2645,76 @@ function ContextItemCard({ item, onPrepare, onRetry, retryingId, feedback }: {
   </section>;
 }
 
+function VersionPanel() {
+  const [state, setState] = useState<{ loading: boolean; data?: { ok?: boolean; versions?: { source?: string | null; installed?: string | null; installsRecord?: string | null; dev?: string | null }; devShadowing?: boolean; note?: string }; error?: string }>({ loading: true });
+  const load = useCallback(() => {
+    setState({ loading: true });
+    api<{ ok?: boolean; versions?: { source?: string | null; installed?: string | null; installsRecord?: string | null; dev?: string | null }; devShadowing?: boolean; note?: string }>('/api/versions')
+      .then((data) => setState({ loading: false, data }))
+      .catch((error: Error) => setState({ loading: false, error: error.message }));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const v = state.data?.versions;
+  return (
+    <div className="panel wide system-list">
+      <PanelHeading title="版本与运行态" />
+      {state.loading ? <p className="muted-note">正在读取版本…</p> : state.error ? <Check label="版本读取" ok={false} detail={state.error} /> : (
+        <>
+          <div className="version-row"><span>源码版本</span><code>{v?.source ?? '—'}</code></div>
+          <div className="version-row"><span>正式安装版</span><code>{v?.installed ?? '—'}</code></div>
+          <div className="version-row"><span>安装记录</span><code>{v?.installsRecord ?? '—'}</code></div>
+          <div className="version-row"><span>开发槽</span><code>{v?.dev ?? '—'}</code></div>
+          <Check label="运行态" ok={!state.data?.devShadowing} detail={state.data?.note || ''} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function CalendarHealthPanel({ onSync }: { onSync: () => void }) {
+  const [state, setState] = useState<{ loading: boolean; data?: { ok?: boolean; inSync?: boolean; diff?: { calendarEvents?: number; managedEvents?: number; desiredEvents?: number; toCreate?: { summary?: string; start?: string }[]; toUpdate?: { summary?: string; start?: string }[]; toDelete?: { summary?: string; start?: string }[] }; output?: string }; error?: string }>({ loading: true });
+  const load = useCallback(() => {
+    setState({ loading: true });
+    api<{ ok?: boolean; inSync?: boolean; diff?: { calendarEvents?: number; managedEvents?: number; desiredEvents?: number; toCreate?: { summary?: string; start?: string }[]; toUpdate?: { summary?: string; start?: string }[]; toDelete?: { summary?: string; start?: string }[] }; output?: string }>('/api/calendar-health')
+      .then((data) => setState({ loading: false, data }))
+      .catch((error: Error) => setState({ loading: false, error: error.message }));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const diff = state.data?.diff;
+  const deletes = diff?.toDelete ?? [];
+  const inSync = state.data?.inSync === true;
+  return (
+    <div className="panel wide system-list">
+      <PanelHeading title="飞书日历对账" />
+      {state.loading ? <p className="muted-note">正在盘点日历差异…</p> : state.error ? <Check label="日历盘点" ok={false} detail={state.error} /> : (
+        <>
+          <Check label="对账结果" ok={inSync} detail={inSync ? '日历与数据库一致，无残留' : '存在差异，见下方清单'} />
+          <div className="calendar-diff-summary">
+            <span>日历事件 {diff?.calendarEvents ?? '—'}</span>
+            <span>托管 {diff?.managedEvents ?? '—'}</span>
+            <span>期望 {diff?.desiredEvents ?? '—'}</span>
+            <span>待建 {diff?.toCreate?.length ?? 0}</span>
+            <span>待更新 {diff?.toUpdate?.length ?? 0}</span>
+            <span className={deletes.length ? 'diff-badge-danger' : ''}>待删除 {deletes.length}</span>
+          </div>
+          {deletes.length > 0 && (
+            <div className="calendar-diff-list">
+              {deletes.slice(0, 8).map((item, index) => (
+                <div key={index} className="calendar-diff-row"><span>{item.summary}</span><span className="muted-note">{String(item.start || '').slice(0, 16)}</span></div>
+              ))}
+              {deletes.length > 8 && <p className="muted-note">另有 {deletes.length - 8} 条待删除…</p>}
+            </div>
+          )}
+          <div className="row-actions">
+            <button type="button" className="ghost-button" onClick={load}>重新盘点</button>
+            {!inSync && <button type="button" className="primary-button" onClick={onSync}>打开同步操作</button>}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function SystemView({ dashboard, onSync, embedded = false }: { dashboard: Dashboard; onSync: () => void; embedded?: boolean }) {
   const verification = dashboard.health?.database?.verification;
   return (
@@ -2673,6 +2743,8 @@ function SystemView({ dashboard, onSync, embedded = false }: { dashboard: Dashbo
           <button type="button" className="primary-button" onClick={onSync}>打开同步操作</button>
         </div>
       </section>
+      <CalendarHealthPanel onSync={onSync} />
+      <VersionPanel />
     </div>
   );
 }

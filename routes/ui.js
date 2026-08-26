@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { commitPreview, createPreview, getDashboard, getPlanningData, getPreview, previewTemplateWeek, summarizeResult } from "../lib/backend.js";
+import { commitPreview, createPreview, getCalendarHealth, getDashboard, getPlanningData, getPreview, getRuntimeVersions, previewTemplateWeek, summarizeResult } from "../lib/backend.js";
 import { getPluginRequestContext, parseModelJson, sampleText } from "../lib/hana-model.js";
 import { createSnapshotCache } from "../lib/snapshot-cache.js";
 
@@ -34,6 +34,24 @@ export default function registerPluginUiRoutes(app, ctx) {
       return c.json(await withSnapshot("planning", () => getPlanningData()));
     } catch (error) {
       ctx.log.error("planning dashboard failed", error);
+      return c.json({ ok: false, error: error.message }, 500);
+    }
+  });
+
+  app.get("/api/versions", async (c) => {
+    try {
+      return c.json(await getRuntimeVersions());
+    } catch (error) {
+      ctx.log.error("versions failed", error);
+      return c.json({ ok: false, error: error.message }, 500);
+    }
+  });
+
+  app.get("/api/calendar-health", async (c) => {
+    try {
+      return c.json(await getCalendarHealth());
+    } catch (error) {
+      ctx.log.error("calendar health failed", error);
       return c.json({ ok: false, error: error.message }, 500);
     }
   });
