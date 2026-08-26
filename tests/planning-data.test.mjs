@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildOperation, buildPlanningStudents, buildTemplateDiagnostics } from '../lib/backend.js';
+import { buildOperation, buildPlanningStudents, buildTemplateDiagnostics, summarizeResult } from '../lib/backend.js';
 
 test('planning students merge readiness, pending and vacation constraints', () => {
   const students = buildPlanningStudents(
@@ -87,4 +87,19 @@ test('template availability differences are advisory rather than a hard readines
   ], [{ name: '甲', availability: [] }], { routes: [] });
   assert.equal(diagnostics.availabilityConflicts.length, 1);
   assert.equal(diagnostics.ready, true);
+});
+
+test('commute questions are shown as advisory and do not become blockers', () => {
+  const summary = summarizeResult({
+    ok: true,
+    data: {
+      dry_run: true,
+      output: '✅ 将新增课程',
+      questions: ['甲到乙通勤需要多少分钟？（当前课间 20 分钟）'],
+      verification: { new_issues: [] },
+    },
+  });
+  assert.match(summary, /通勤确认（仅提示，不锁定）/);
+  assert.match(summary, /甲到乙通勤需要多少分钟/);
+  assert.doesNotMatch(summary, /阻止提交/);
 });

@@ -12022,7 +12022,7 @@ function Lv({ onAction: c, onAskAi: o, refreshKey: m, scheduleText: f, onDataCha
   }
   if (M) return /* @__PURE__ */ i.jsx(mn, { tone: "error", title: "筹备数据读取失败", text: M });
   if (!p) return /* @__PURE__ */ i.jsx(Lm, {});
-  const B = p.summary, ze = p.students.filter((d) => d.confirmed && d.zone !== "未分区" && (d.availability.length > 0 || d.hasReservation)).length, Ae = B.activeStudentCount ? Math.round(ze / B.activeStudentCount * 100) : 100, je = p.commute.overlaps.length + p.commute.missingRoutes.length, et = new Map(p.audit.reservation_hard_blockers.map((d) => [d.reservation_id, d.reasons])), Ue = p.students.filter((d) => N === "all" ? !0 : N === "availability" ? !d.availability.length && !d.hasReservation : N === "zone" ? d.zone === "未分区" : N === "pending" ? !!d.pendingWeekday || !d.confirmed : d.issues.length > 0), Ve = V ? Ue : Ue.slice(0, 10), b = p.sources.filter((d) => !d.ok);
+  const B = p.summary, ze = p.students.filter((d) => d.confirmed && d.zone !== "未分区" && (d.availability.length > 0 || d.hasReservation)).length, Ae = B.activeStudentCount ? Math.round(ze / B.activeStudentCount * 100) : 100, je = p.commute.overlaps.length, et = new Map(p.audit.reservation_hard_blockers.map((d) => [d.reservation_id, d.reasons])), Ue = p.students.filter((d) => N === "all" ? !0 : N === "availability" ? !d.availability.length && !d.hasReservation : N === "zone" ? d.zone === "未分区" : N === "pending" ? !!d.pendingWeekday || !d.confirmed : d.issues.length > 0), Ve = V ? Ue : Ue.slice(0, 10), b = p.sources.filter((d) => !d.ok);
   return /* @__PURE__ */ i.jsxs("div", { className: "view-stack planning-workspace", children: [
     /* @__PURE__ */ i.jsx(fr, { eyebrow: "规划层", title: "开学筹备与课程预留", description: "从资料缺口开始，经过预演和预留，再确认进入正式课表。" }),
     b.length > 0 && /* @__PURE__ */ i.jsx(mn, { tone: "warn", title: `${b.length} 项筹备数据读取异常`, text: b.map((d) => `${d.label}：${d.message || "读取失败"}`).join("；") }),
@@ -12137,12 +12137,10 @@ function Lv({ onAction: c, onAskAi: o, refreshKey: m, scheduleText: f, onDataCha
       /* @__PURE__ */ i.jsxs("div", { className: "panel planning-overview-card", children: [
         /* @__PURE__ */ i.jsxs("div", { children: [
           /* @__PURE__ */ i.jsx("p", { className: "eyebrow", children: "下一道关口" }),
-          /* @__PURE__ */ i.jsx("h3", { children: je ? "候选生成前还有硬约束" : "可以进入候选预演" }),
+          /* @__PURE__ */ i.jsx("h3", { children: je ? "候选生成前还有时间重叠" : "可以进入候选预演" }),
           /* @__PURE__ */ i.jsxs("span", { children: [
             je,
-            " 项重叠或通勤缺口；",
-            B.templateAvailabilityAdvisoryCount,
-            " 项长期候选时间差异仅作提示。"
+            " 项时间重叠；通勤缺口和长期候选时间差异都在排具体时间时提示。"
           ] })
         ] }),
         /* @__PURE__ */ i.jsxs("div", { className: "planning-overview-actions", children: [
@@ -12263,7 +12261,7 @@ function Lv({ onAction: c, onAskAi: o, refreshKey: m, scheduleText: f, onDataCha
               y
             ] }) })
           ] }, d.reservation_id);
-        }) }) : /* @__PURE__ */ i.jsx($t, { title: "当前没有预留", text: "未确认的安排先放在这里；确认时长期候选时间只作提示，硬冲突和通勤仍会校验。", compact: !0 })
+        }) }) : /* @__PURE__ */ i.jsx($t, { title: "当前没有预留", text: "未确认的安排先放在这里；确认时课程重叠、出游和老师冲突仍会拦截，通勤只提示询问。", compact: !0 })
       ] }),
       /* @__PURE__ */ i.jsxs("div", { className: "panel template-health-panel", children: [
         /* @__PURE__ */ i.jsxs("div", { className: "planning-panel-head compact", children: [
@@ -12272,9 +12270,7 @@ function Lv({ onAction: c, onAskAi: o, refreshKey: m, scheduleText: f, onDataCha
             /* @__PURE__ */ i.jsx("h3", { children: "固定模板体检" }),
             /* @__PURE__ */ i.jsxs("span", { children: [
               B.templateCount,
-              " 条模板 · ",
-              p.commute.requiredRouteCount,
-              " 段相邻通勤"
+              " 条模板 · 通勤只作排时间提示"
             ] })
           ] }),
           /* @__PURE__ */ i.jsx("button", { type: "button", className: "row-action-button", disabled: J, onClick: () => {
@@ -12284,7 +12280,7 @@ function Lv({ onAction: c, onAskAi: o, refreshKey: m, scheduleText: f, onDataCha
         /* @__PURE__ */ i.jsxs("div", { className: "template-issue-list", children: [
           /* @__PURE__ */ i.jsx(Is, { label: "时间重叠", count: p.commute.overlaps.length, tone: "danger", details: p.commute.overlaps.slice(0, 3).map((d) => `${d.weekday} ${d.first} ${d.firstRange} / ${d.second} ${d.secondRange}`) }),
           /* @__PURE__ */ i.jsx(Is, { label: "长期候选时间差异", count: p.commute.availabilityConflicts.length, tone: "neutral", details: p.commute.availabilityConflicts.slice(0, 3).map((d) => `${d.student} ${d.weekday} ${d.startTime}-${d.endTime}（仅提示）`) }),
-          /* @__PURE__ */ i.jsx(Is, { label: "缺相邻通勤", count: p.commute.missingRoutes.length, tone: "neutral", details: p.commute.missingRoutes.slice(0, 3).map((d) => `${d.weekday} ${d.from} → ${d.to}`) })
+          /* @__PURE__ */ i.jsx(Is, { label: "排时间时再问通勤", count: p.commute.missingRoutes.length, tone: "neutral", details: p.commute.missingRoutes.slice(0, 3).map((d) => `${d.weekday} ${d.from} → ${d.to}`) })
         ] }),
         p.commute.missingRoutes.slice(0, 2).map((d) => /* @__PURE__ */ i.jsxs("button", { type: "button", className: "route-fix-button", onClick: () => c({ operation: "commute_set", fromStudent: d.from, toStudent: d.to }), children: [
           "补录 ",
@@ -12737,7 +12733,7 @@ function Vv({ pending: c, students: o, preset: m, aiDraft: f, preview: _, busy: 
               /* @__PURE__ */ i.jsx("input", { name: "overrideAvailability", type: "checkbox", value: "true", defaultChecked: !!m?.overrideAvailability }),
               /* @__PURE__ */ i.jsxs("span", { children: [
                 /* @__PURE__ */ i.jsx("strong", { children: "这是已明确的单次时间" }),
-                /* @__PURE__ */ i.jsx("small", { children: "只覆盖长期候选时间，不修改长期资料，也不绕过通勤和冲突。" })
+                /* @__PURE__ */ i.jsx("small", { children: "只覆盖长期候选时间，不修改长期资料；通勤会提示询问，不锁定落课。" })
               ] })
             ] })
           ] }),
@@ -12783,7 +12779,7 @@ function Vv({ pending: c, students: o, preset: m, aiDraft: f, preview: _, busy: 
               /* @__PURE__ */ i.jsx("input", { name: "overrideAvailability", type: "checkbox", value: "true", defaultChecked: !!m?.overrideAvailability }),
               /* @__PURE__ */ i.jsxs("span", { children: [
                 /* @__PURE__ */ i.jsx("strong", { children: "这是已明确的单次时间" }),
-                /* @__PURE__ */ i.jsx("small", { children: "只覆盖长期候选时间，不修改长期资料，也不绕过通勤和冲突。" })
+                /* @__PURE__ */ i.jsx("small", { children: "只覆盖长期候选时间，不修改长期资料；通勤会提示询问，不锁定落课。" })
               ] })
             ] })
           ] }),
@@ -12832,7 +12828,7 @@ function Vv({ pending: c, students: o, preset: m, aiDraft: f, preview: _, busy: 
           ] }),
           ["reservation_confirm", "reservation_cancel"].includes(N) && /* @__PURE__ */ i.jsxs(i.Fragment, { children: [
             /* @__PURE__ */ i.jsx(ce, { name: "reservationId", label: "预留ID", placeholder: "res_…", defaultValue: m?.reservationId || m?.id, required: !0 }),
-            /* @__PURE__ */ i.jsx("div", { className: "field-note full", children: "确认预留即确认这个具体日期与时间：长期候选时间只作提示；出游、重复课程、老师冲突和通勤仍会校验。" })
+            /* @__PURE__ */ i.jsx("div", { className: "field-note full", children: "确认预留即确认这个具体日期与时间：出游、重复课程和老师冲突仍会校验；通勤只提示询问。" })
           ] }),
           N === "zone_set" && /* @__PURE__ */ i.jsxs(i.Fragment, { children: [
             /* @__PURE__ */ i.jsx(ce, { name: "student", label: "学生", defaultValue: m?.student, required: !0 }),
@@ -12974,7 +12970,7 @@ function Vv({ pending: c, students: o, preset: m, aiDraft: f, preview: _, busy: 
         ] }, JSON.stringify(m || { operation: N })),
         /* @__PURE__ */ i.jsxs("div", { className: "panel preview-panel", children: [
           /* @__PURE__ */ i.jsx(tl, { title: "执行预览", meta: _?.token ? `令牌 ${_.token.slice(0, 8)}…` : "等待操作" }),
-          !_ && /* @__PURE__ */ i.jsx($t, { title: "尚未预演", text: "填写左侧表单后，先检查冲突、通勤、可用时间和事务版本。" }),
+          !_ && /* @__PURE__ */ i.jsx($t, { title: "尚未预演", text: "填写左侧表单后，先检查硬冲突和可用时间；通勤只在需要时询问。" }),
           _ && /* @__PURE__ */ i.jsxs("div", { className: "preview-body", children: [
             /* @__PURE__ */ i.jsxs("div", { className: _.canCommit ? "preview-status pass" : _.ok ? "preview-status neutral" : "preview-status fail", children: [
               /* @__PURE__ */ i.jsx("i", {}),

@@ -1501,7 +1501,7 @@ function PlanningView({ onAction, onAskAi, refreshKey, scheduleText, onDataChang
   const summary = planning.summary;
   const coreReadyCount = planning.students.filter((student) => student.confirmed && student.zone !== '未分区' && (student.availability.length > 0 || student.hasReservation)).length;
   const readinessPercent = summary.activeStudentCount ? Math.round((coreReadyCount / summary.activeStudentCount) * 100) : 100;
-  const templateIssueCount = planning.commute.overlaps.length + planning.commute.missingRoutes.length;
+  const templateIssueCount = planning.commute.overlaps.length;
   const reservationBlockers = new Map(planning.audit.reservation_hard_blockers.map((item) => [item.reservation_id, item.reasons]));
   const filteredStudents = planning.students.filter((student) => {
     if (studentFilter === 'all') return true;
@@ -1566,7 +1566,7 @@ function PlanningView({ onAction, onAskAi, refreshKey, scheduleText, onDataChang
           </div>
         </div>
         <div className="panel planning-overview-card">
-          <div><p className="eyebrow">下一道关口</p><h3>{templateIssueCount ? '候选生成前还有硬约束' : '可以进入候选预演'}</h3><span>{templateIssueCount} 项重叠或通勤缺口；{summary.templateAvailabilityAdvisoryCount} 项长期候选时间差异仅作提示。</span></div>
+          <div><p className="eyebrow">下一道关口</p><h3>{templateIssueCount ? '候选生成前还有时间重叠' : '可以进入候选预演'}</h3><span>{templateIssueCount} 项时间重叠；通勤缺口和长期候选时间差异都在排具体时间时提示。</span></div>
           <div className="planning-overview-actions">
             <button type="button" onClick={() => setPlanningSection('candidates')}>查看候选与预留</button>
             {(summary.reviewCount + summary.overdueCount + failedSources.length) > 0 && <button type="button" onClick={() => setPlanningSection('review')}>处理复核与异常</button>}
@@ -1632,18 +1632,18 @@ function PlanningView({ onAction, onAskAi, refreshKey, scheduleText, onDataChang
                 </> : <span className="reservation-state-chip confirmed">✓ {displayStatus}</span>}
               </div>
             </article>;
-          })}</div> : <Empty title="当前没有预留" text="未确认的安排先放在这里；确认时长期候选时间只作提示，硬冲突和通勤仍会校验。" compact />}
+          })}</div> : <Empty title="当前没有预留" text="未确认的安排先放在这里；确认时课程重叠、出游和老师冲突仍会拦截，通勤只提示询问。" compact />}
         </div>
 
         <div className="panel template-health-panel">
           <div className="planning-panel-head compact">
-            <div><p className="eyebrow">候选前检查</p><h3>固定模板体检</h3><span>{summary.templateCount} 条模板 · {planning.commute.requiredRouteCount} 段相邻通勤</span></div>
+            <div><p className="eyebrow">候选前检查</p><h3>固定模板体检</h3><span>{summary.templateCount} 条模板 · 通勤只作排时间提示</span></div>
             <button type="button" className="row-action-button" disabled={checkingTemplate} onClick={() => void runTemplateCheck()}>{checkingTemplate ? '正在预演…' : '预演本周模板'}</button>
           </div>
           <div className="template-issue-list">
             <TemplateIssue label="时间重叠" count={planning.commute.overlaps.length} tone="danger" details={planning.commute.overlaps.slice(0, 3).map((item) => `${item.weekday} ${item.first} ${item.firstRange} / ${item.second} ${item.secondRange}`)} />
             <TemplateIssue label="长期候选时间差异" count={planning.commute.availabilityConflicts.length} tone="neutral" details={planning.commute.availabilityConflicts.slice(0, 3).map((item) => `${item.student} ${item.weekday} ${item.startTime}-${item.endTime}（仅提示）`)} />
-            <TemplateIssue label="缺相邻通勤" count={planning.commute.missingRoutes.length} tone="neutral" details={planning.commute.missingRoutes.slice(0, 3).map((item) => `${item.weekday} ${item.from} → ${item.to}`)} />
+            <TemplateIssue label="排时间时再问通勤" count={planning.commute.missingRoutes.length} tone="neutral" details={planning.commute.missingRoutes.slice(0, 3).map((item) => `${item.weekday} ${item.from} → ${item.to}`)} />
           </div>
           {planning.commute.missingRoutes.slice(0, 2).map((route) => <button type="button" className="route-fix-button" key={`${route.weekday}-${route.from}-${route.to}`} onClick={() => onAction({ operation: 'commute_set', fromStudent: route.from, toStudent: route.to })}>补录 {route.from} → {route.to}</button>)}
           {templateCheck && <div className={templateCheck.passed ? 'template-check-result pass' : 'template-check-result fail'}><strong>{templateCheck.passed ? '模板预演通过' : '模板预演未通过'}</strong><pre>{templateCheck.error || templateCheck.output || '没有返回详情'}</pre></div>}
@@ -2160,7 +2160,7 @@ function ActionsView({ pending, students, preset, aiDraft, preview, busy, onPrev
             <Field name="fromTime" label="原时间" type="time" defaultValue={preset?.fromTime} required />
             <Field name="toDate" label="新日期" type="date" defaultValue={preset?.toDate} required />
             <Field name="toTime" label="新时间" type="time" defaultValue={preset?.toTime} required />
-            <label className="exception-toggle full"><input name="overrideAvailability" type="checkbox" value="true" defaultChecked={Boolean(preset?.overrideAvailability)} /><span><strong>这是已明确的单次时间</strong><small>只覆盖长期候选时间，不修改长期资料，也不绕过通勤和冲突。</small></span></label>
+            <label className="exception-toggle full"><input name="overrideAvailability" type="checkbox" value="true" defaultChecked={Boolean(preset?.overrideAvailability)} /><span><strong>这是已明确的单次时间</strong><small>只覆盖长期候选时间，不修改长期资料；通勤会提示询问，不锁定落课。</small></span></label>
           </>}
 
           {kind === 'course_cancel' && <>
@@ -2194,7 +2194,7 @@ function ActionsView({ pending, students, preset, aiDraft, preview, busy, onPrev
               <input name="duration" type="number" min="1" max="480" value={courseAddDuration} onChange={(event) => setCourseAddDuration(event.target.value)} required />
             </label>
             <Field name="note" label="备注（可选）" defaultValue={preset?.note} />
-            <label className="exception-toggle full"><input name="overrideAvailability" type="checkbox" value="true" defaultChecked={Boolean(preset?.overrideAvailability)} /><span><strong>这是已明确的单次时间</strong><small>只覆盖长期候选时间，不修改长期资料，也不绕过通勤和冲突。</small></span></label>
+            <label className="exception-toggle full"><input name="overrideAvailability" type="checkbox" value="true" defaultChecked={Boolean(preset?.overrideAvailability)} /><span><strong>这是已明确的单次时间</strong><small>只覆盖长期候选时间，不修改长期资料；通勤会提示询问，不锁定落课。</small></span></label>
           </>}
 
           {kind === 'reservation_add' && <>
@@ -2236,7 +2236,7 @@ function ActionsView({ pending, students, preset, aiDraft, preview, busy, onPrev
 
           {['reservation_confirm', 'reservation_cancel'].includes(kind) && <>
             <Field name="reservationId" label="预留ID" placeholder="res_…" defaultValue={preset?.reservationId || preset?.id} required />
-            <div className="field-note full">确认预留即确认这个具体日期与时间：长期候选时间只作提示；出游、重复课程、老师冲突和通勤仍会校验。</div>
+            <div className="field-note full">确认预留即确认这个具体日期与时间：出游、重复课程和老师冲突仍会校验；通勤只提示询问。</div>
           </>}
 
           {kind === 'zone_set' && <>
@@ -2387,7 +2387,7 @@ function ActionsView({ pending, students, preset, aiDraft, preview, busy, onPrev
 
         <div className="panel preview-panel">
           <PanelHeading title="执行预览" meta={preview?.token ? `令牌 ${preview.token.slice(0, 8)}…` : '等待操作'} />
-          {!preview && <Empty title="尚未预演" text="填写左侧表单后，先检查冲突、通勤、可用时间和事务版本。" />}
+          {!preview && <Empty title="尚未预演" text="填写左侧表单后，先检查硬冲突和可用时间；通勤只在需要时询问。" />}
           {preview && (
             <div className="preview-body">
               <div className={preview.canCommit ? 'preview-status pass' : preview.ok ? 'preview-status neutral' : 'preview-status fail'}>
