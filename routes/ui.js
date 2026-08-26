@@ -330,9 +330,10 @@ function buildAiSchedulingPrompt() {
 function renderShell(c, ctx, surface) {
   const hanaCss = c.req.query("hana-css") || "";
   const theme = c.req.query("hana-theme") || "inherit";
+  const token = c.req.query("token") || "";
   const assetBase = `/api/plugins/${encodeURIComponent(ctx.pluginId)}/assets`;
-  const panelCss = appendAssetVersion(`${assetBase}/panel.css`);
-  const panelJs = appendAssetVersion(`${assetBase}/panel.js`);
+  const panelCss = appendAssetQuery(`${assetBase}/panel.css`, token);
+  const panelJs = appendAssetQuery(`${assetBase}/panel.js`, token);
   const title = "课务台";
 
   return `<!doctype html>
@@ -361,9 +362,12 @@ function renderShell(c, ctx, surface) {
 </html>`;
 }
 
-// 资产鉴权由 Hana 的 HttpOnly surface session cookie 负责；URL 只携带缓存版本。
-function appendAssetVersion(url) {
-  return `${url}?v=${encodeURIComponent(PLUGIN_VERSION)}`;
+// Hana 0.450.0 的页面路由可以收到凭据，但 <link>/<script> 资产请求尚未稳定继承
+// surface session cookie；短期页面 token 仅附加到同插件静态资源，XHR 仍统一走 hana.api.fetch。
+function appendAssetQuery(url, token) {
+  const query = new URLSearchParams({ v: PLUGIN_VERSION });
+  if (token) query.set("token", token);
+  return `${url}?${query.toString()}`;
 }
 
 function escapeAttr(value) {

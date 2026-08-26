@@ -125,14 +125,16 @@ test('04:00 日界线在上海时区统一生效', () => {
   assert.equal(logicalDateParts(new Date('2026-08-25T20:00:00Z')), '2026-08-26');
 });
 
-test('版本来源一致且资产 URL 不再携带 token', () => {
+test('版本来源一致且 token 只用于同插件静态资源兼容', () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(projectRoot, 'manifest.json'), 'utf8'));
   const pkg = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
   const readme = fs.readFileSync(path.join(projectRoot, 'README.md'), 'utf8');
   const routes = fs.readFileSync(path.join(projectRoot, 'routes/ui.js'), 'utf8');
+  const apiClient = fs.readFileSync(path.join(projectRoot, 'ui/api-client.ts'), 'utf8');
   assert.equal(manifest.version, pkg.version);
   assert.match(readme, new RegExp(`当前版本：v${manifest.version.replaceAll('.', '\\.')}`));
   assert.match(routes, /manifest\.json/);
-  assert.doesNotMatch(routes, /query\.set\(["']token["']/);
+  assert.match(routes, /if \(token\) query\.set\("token", token\)/);
+  assert.doesNotMatch(apiClient, /token|pluginFallbackUrl|window\.fetch/);
   assert.doesNotMatch(routes, /0\.5\.37/);
 });

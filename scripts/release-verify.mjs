@@ -19,7 +19,9 @@ for (const file of ['assets/panel.js', 'assets/panel.css', 'index.js', 'lib/back
   if (!fs.existsSync(path.join(root, file))) failures.push(`缺少发布文件：${file}`);
 }
 const routes = read('routes/ui.js').toString('utf8');
-if (/query\.set\(["']token["']/.test(routes)) failures.push('静态资源 URL 仍携带 token');
+const apiClient = read('ui/api-client.ts').toString('utf8');
+if (!/if \(token\) query\.set\(["']token["'], token\)/.test(routes)) failures.push('缺少 Hana 0.450.0 静态资源 token 兼容');
+if (/token|pluginFallbackUrl|window\.fetch/.test(apiClient)) failures.push('业务 XHR 不得携带页面 token 或回退到 window.fetch');
 if (/0\.5\.37/.test(routes)) failures.push('仍存在幽灵缓存版本 0.5.37');
 
 if (failures.length) {
