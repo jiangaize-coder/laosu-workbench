@@ -5,6 +5,7 @@ import { hana } from '@hana/plugin-sdk';
 import { HanaThemeProvider } from '@hana/plugin-components';
 import '@hana/plugin-components/styles.css';
 import './panel.css';
+import './design-system.css';
 import { addDateDays, buildMonthGridDates, buildWeekDates, buildWeekPageSlots, calendarHourBounds, eventGeometry, itemDateKey, layoutOverlappingItems, parseDateRange, type CalendarItemLike } from './calendar-layout';
 import { api } from './api-client';
 import { createRequestGate } from './request-gate';
@@ -356,7 +357,7 @@ class WorkbenchErrorBoundary extends Component<{ children: ReactNode }, { error:
   render() {
     if (!this.state.error) return this.props.children;
     return (
-      <div className="workbench-shell">
+      <div className="workbench-shell" data-ui="workbench-shell" data-ui-id="workbench-error">
         <main className="main-area">
           <div className="notice error" role="alert">
             <strong>课务台页面异常</strong>
@@ -1141,22 +1142,22 @@ function Panel() {
 
   return (
     <HanaThemeProvider mode="inherit" className="workbench-theme">
-      <div className="workbench-shell">
-        <header className="topbar">
-          <nav className="tabbar" aria-label="工作台导航">
+      <div className="workbench-shell" data-ui="workbench-shell" data-ui-id="workbench-main">
+        <header className="topbar" data-ui="topbar">
+          <nav className="tabbar" aria-label="工作台导航" data-ui="primary-navigation">
             {tabs.map((item) => (
-              <button type="button" key={item.id} className={tab === item.id ? 'tab active' : 'tab'} onClick={() => navigateTo(item.id)}>
+              <button type="button" key={item.id} className={tab === item.id ? 'tab active' : 'tab'} data-ui-role="nav-item" data-ui-id={`nav-${item.id}`} aria-current={tab === item.id ? 'page' : undefined} onClick={() => navigateTo(item.id)}>
                 {item.label}
               </button>
             ))}
           </nav>
-          <div className="top-actions">
-            <button type="button" className={actionOpen ? 'ai-action-button active' : 'ai-action-button'} onClick={openAi} aria-expanded={actionOpen}>✦ AI 操作</button>
+          <div className="top-actions" data-ui="top-actions">
+            <button type="button" className={actionOpen ? 'ai-action-button active' : 'ai-action-button'} data-ui-role="button" data-ui-variant="secondary" data-ui-id="open-ai" onClick={openAi} aria-expanded={actionOpen}>✦ AI 操作</button>
             <span className="updated-at">{formatUpdated(dashboard?.observedAt)}</span>
-            <button type="button" className={`${dashboard?.health?.ok ? 'health good' : 'health bad'} health-button${contextView?.kind === 'system' ? ' active' : ''}`} onClick={(event) => openSystem(event.currentTarget)} aria-expanded={contextView?.kind === 'system'}>
+            <button type="button" className={`${dashboard?.health?.ok ? 'health good' : 'health bad'} health-button${contextView?.kind === 'system' ? ' active' : ''}`} data-ui-role="button" data-ui-variant="secondary" data-ui-id="open-system-status" onClick={(event) => openSystem(event.currentTarget)} aria-expanded={contextView?.kind === 'system'}>
               <i />{dashboard?.health?.ok ? '系统正常' : '需要检查'}
             </button>
-            <button type="button" className="icon-button" onClick={() => void refreshCurrent()} aria-label="刷新" disabled={loading}>↻</button>
+            <button type="button" className="icon-button" data-ui-role="button" data-ui-variant="icon" data-ui-id="refresh-workbench" onClick={() => void refreshCurrent()} aria-label="刷新" disabled={loading}>↻</button>
           </div>
         </header>
 
@@ -1188,7 +1189,7 @@ function Panel() {
         </main>
 
         <div className="context-drawer-backdrop" hidden={!contextOpen} onMouseDown={(event) => { if (event.currentTarget === event.target) closeContextDrawer(); }}>
-          <aside ref={contextDrawerRef} className="context-drawer" role="dialog" aria-modal="true" aria-label="详情">
+          <aside ref={contextDrawerRef} className="context-drawer" data-ui="drawer" data-ui-id="context-drawer" role="dialog" aria-modal="true" aria-label="详情">
             <header className="context-drawer-head">
               <button type="button" className="context-back" onClick={closeContextDrawer} aria-label="返回原位置">←</button>
               <div>
@@ -1215,7 +1216,7 @@ function Panel() {
         </div>
 
         <div className="action-drawer-backdrop" hidden={!actionOpen} onMouseDown={(event) => { if (event.currentTarget === event.target) closeActionDrawer(); }}>
-          <aside ref={drawerRef} className="action-drawer" role="dialog" aria-modal="true" aria-label="AI 操作">
+          <aside ref={drawerRef} className="action-drawer" data-ui="drawer" data-ui-id="ai-drawer" role="dialog" aria-modal="true" aria-label="AI 操作">
             <header className="action-drawer-head">
               <button type="button" className="context-back" onClick={closeActionDrawer} aria-label="返回原位置">←</button>
               <div><p className="eyebrow">AI 操作</p><h2>说一句，先预演再提交。</h2><span>返回后仍留在原页面，执行结果会即时回读。</span></div>
@@ -1541,16 +1542,16 @@ function ItemActionButtons({ item, onQuick, onAskAi, onRetry, retryingId, feedba
   // 交互铁律：一到两步的事按钮点一下（内部预演+提交+回读），两步以上的事交给 AI。
   if (item.domain === 'course') {
     if (!date || !time) return null;
-    return <div className={`item-action-buttons${compact ? ' compact' : ''}`} onClick={(event) => event.stopPropagation()}>
-      {onAskAi && <button type="button" className="secondary" onClick={() => onAskAi(`把${item.title} ${date} ${time} 的这节课调一下时间`)}>调时间</button>}
-      {onQuick && <button type="button" className="danger" onClick={() => onQuick('courseCancel', item)}>本次不上</button>}
+    return <div className={`item-action-buttons${compact ? ' compact' : ''}`} data-ui="item-actions" onClick={(event) => event.stopPropagation()}>
+      {onAskAi && <button type="button" className="secondary" data-ui-role="button" data-ui-variant="secondary" data-ui-action="course-move" onClick={() => onAskAi(`把${item.title} ${date} ${time} 的这节课调一下时间`)}>调时间</button>}
+      {onQuick && <button type="button" className="danger" data-ui-role="button" data-ui-variant="danger" data-ui-action="course-cancel" onClick={() => onQuick('courseCancel', item)}>本次不上</button>}
     </div>;
   }
   const retrying = retryingId === item.id;
-  return <div className={`item-action-buttons${compact ? ' compact' : ''}`} onClick={(event) => event.stopPropagation()}>
-    <button type="button" className="primary" disabled={Boolean(retryingId) || feedback?.ok} onClick={() => onQuick?.('affairComplete', item)}>{feedback?.ok ? '已完成' : '完成'}</button>
+  return <div className={`item-action-buttons${compact ? ' compact' : ''}`} data-ui="item-actions" onClick={(event) => event.stopPropagation()}>
+    <button type="button" className="primary" data-ui-role="button" data-ui-variant="primary" data-ui-action="affair-complete" disabled={Boolean(retryingId) || feedback?.ok} onClick={() => onQuick?.('affairComplete', item)}>{feedback?.ok ? '已完成' : '完成'}</button>
     {item.retry && onRetry
-      ? <button type="button" className="secondary" disabled={Boolean(retryingId) || Boolean(feedback?.ok)} aria-busy={retrying} onClick={() => void onRetry(item)}>{retrying ? '处理中…' : feedback?.buttonLabel || '没约上'}</button>
+      ? <button type="button" className="secondary" data-ui-role="button" data-ui-variant="secondary" data-ui-action="affair-retry" disabled={Boolean(retryingId) || Boolean(feedback?.ok)} aria-busy={retrying} onClick={() => void onRetry(item)}>{retrying ? '处理中…' : feedback?.buttonLabel || '没约上'}</button>
       : null}
   </div>;
 }
@@ -1896,7 +1897,7 @@ function CockpitView({ onAction, onAskAi, refreshKey = 0 }: { onAction: (preset:
                       <span>{course.title}</span>
                       <span className="cockpit-card-time">{String(course.start).slice(11, 16)}–{String(course.end).slice(11, 16)}</span>
                     </button>
-                    <button type="button" className="cockpit-card-ai" title="用一句话交给 AI 调时间" onClick={() => onAskAi('把' + course.title + ' ' + day.date + ' ' + String(course.start).slice(11, 16) + ' 的这节课调一下时间')}>AI</button>
+                    <button type="button" className="cockpit-card-ai" data-ui-role="button" data-ui-variant="secondary" data-ui-action="course-move" title="用一句话交给 AI 调时间" onClick={() => onAskAi('把' + course.title + ' ' + day.date + ' ' + String(course.start).slice(11, 16) + ' 的这节课调一下时间')}>调时间</button>
                   </div>
                 ))}
                 {day.reservations.map((reservation, index) => (
@@ -2179,7 +2180,7 @@ function PlanningView({ onAction, onAskAi, refreshKey, sectionHint, scheduleText
               <div className="reservation-main"><strong>{reservation.student}</strong><span>{reservation.start_time}-{reservation.end_time} · {reservation.duration} 分钟{reservation.zone ? ` · ${reservation.zone}` : ''}</span><small id={blockerId}>{displayStatus}{conflictCount ? ` · ${conflictCount} 项软冲突` : ''}{hardBlockers.length ? ` · 硬约束：${hardBlockers.join('、')}` : ''}{reservation.note ? ` · ${reservation.note}` : ''}</small></div>
               <div className="reservation-actions">
                 {reservation.status === '预期' ? <>
-                  <button type="button" onClick={() => onAction({ operation: 'reservation_update', reservationId: reservation.reservation_id, date: reservation.reservation_date, time: reservation.start_time, duration: reservation.duration, zone: reservation.zone || '', note: reservation.note || '' })}>调整时间</button>
+                  <button type="button" data-ui-role="button" data-ui-variant="secondary" data-ui-action="reservation-update" onClick={() => onAction({ operation: 'reservation_update', reservationId: reservation.reservation_id, date: reservation.reservation_date, time: reservation.start_time, duration: reservation.duration, zone: reservation.zone || '', note: reservation.note || '' })}>调时间</button>
                   <button type="button" className="primary" disabled={hardBlockers.length > 0} aria-describedby={hardBlockers.length ? blockerId : undefined} onClick={() => onAction({ operation: 'reservation_confirm', reservationId: reservation.reservation_id })}>{hardBlockers.length ? '暂不可落课' : '确认落课'}</button>
                   <button type="button" className="quiet-danger" onClick={() => onAction({ operation: 'reservation_cancel', reservationId: reservation.reservation_id })}>取消预留</button>
                 </> : <span className="reservation-state-chip confirmed">✓ {displayStatus}</span>}
@@ -2497,7 +2498,7 @@ const placementsByDate = useMemo(() => {
                         <button type="button" className="secondary" disabled={anyReservationBusy} onClick={() => {
                           setOpenedEntryId(null);
                           onAction({ operation: 'reservation_update', reservationId: item.reservationId, date: item.date, time: item.start_time, duration: item.duration, zone: item.zone || '', note: item.note || '' });
-                        }}>调整时间</button>
+                        }}>调时间</button>
                         <button type="button" className="primary" disabled={confirmDisabled} aria-busy={isBusy} onClick={() => {
                           const pending = onConfirmReservation(item.reservationId!);
                           if (pending && typeof pending.then === "function") {
@@ -2505,7 +2506,7 @@ const placementsByDate = useMemo(() => {
                           }
                         }}>{isBusy ? '确认中…' : anyReservationBusy ? '处理中…' : item.stateClass === 'paused' ? '学生已暂停' : item.blockerText ? '暂不能确认' : '确认落课'}</button>
                       </> : <>
-                        <button type="button" className="secondary" onClick={() => onAction({ operation: 'course_move', student: item.student, fromDate: item.date, fromTime: item.start_time, toDate: item.date, toTime: item.start_time, duration: item.duration })}>调整时间</button>
+                        <button type="button" className="secondary" data-ui-role="button" data-ui-variant="secondary" data-ui-action="course-move" onClick={() => onAction({ operation: 'course_move', student: item.student, fromDate: item.date, fromTime: item.start_time, toDate: item.date, toTime: item.start_time, duration: item.duration })}>调时间</button>
                         <button type="button" className="danger" onClick={() => onAction({ operation: 'course_cancel', student: item.student, date: item.date, time: item.start_time })}>本次不上</button>
                         <button type="button" className="quiet-danger" disabled={anyReservationBusy} onClick={() => { const pendingCancel = onCancelReservation(item.reservationId!); if (pendingCancel && typeof pendingCancel.then === 'function') void pendingCancel.finally(() => setOpenedEntryId(null)); }}>取消预留</button>
                       </>}
@@ -2593,7 +2594,7 @@ function AffairCard({ item, onInspect, onPrepare, onQuick, onAskAi, onRetry, onR
           {item.retry && onRetry
             ? <button type="button" className="affair-do secondary" disabled={Boolean(retryingId) || Boolean(feedback?.ok)} aria-busy={retrying} onClick={() => void onRetry(item)}>{retrying ? '处理中…' : feedback?.buttonLabel || '没约上'}</button>
             : onAskAi
-              ? <button type="button" className="affair-do secondary" onClick={() => onAskAi(`把「${item.title}」（${item.id}）调整一下`)}>调</button>
+              ? <button type="button" className="affair-do secondary" data-ui-role="button" data-ui-variant="secondary" data-ui-action="affair-adjust" onClick={() => onAskAi(`把「${item.title}」（${item.id}）调整一下`)}>调时间</button>
               : <button type="button" className="affair-do quiet" onClick={() => onPrepare({ operation: 'affair_cancel', id: item.id, expectedVersion: item.version })}>取消</button>}
         </>}
       </div>
@@ -3402,14 +3403,14 @@ function ContextItemCard({ item, onPrepare, onQuick, onAskAi, onRetry, onRetryPr
     {feedback?.undo && onRetryPrev ? <button type="button" className="row-action-button" disabled={Boolean(retryingId)} onClick={() => void onRetryPrev(item)}>撤销推进</button> : null}
     {!finished && <div className="context-item-actions">
       {item.domain === 'course' ? <>
-        <button type="button" className="primary-button" onClick={() => onAskAi?.(`把${item.title} ${item.start_at?.slice(5, 10)} ${item.start_at?.slice(11, 16)} 的这节课调一下时间`)}>AI 调时间</button>
+        <button type="button" className="primary-button" data-ui-role="button" data-ui-variant="primary" data-ui-action="course-move" onClick={() => onAskAi?.(`把${item.title} ${item.start_at?.slice(5, 10)} ${item.start_at?.slice(11, 16)} 的这节课调一下时间`)}>调时间</button>
         <button type="button" className="row-action-button quiet-danger" disabled={Boolean(retryingId)} onClick={() => onQuick?.('courseCancel', item)}>本次不上</button>
       </> : <>
         <button type="button" className="primary-button" disabled={Boolean(retryingId) || feedback?.ok} onClick={() => onQuick?.('affairComplete', item)}>{feedback?.ok ? '已完成' : '完成'}</button>
         {item.retry
           ? <button type="button" className={feedback?.ok ? 'row-action-button quick-success' : 'row-action-button'} disabled={Boolean(retryingId) || Boolean(feedback?.ok)} onClick={() => void onRetry(item)}>{retryingId === item.id ? '处理中…' : feedback?.buttonLabel || '没约上'}</button>
           : onAskAi
-            ? <button type="button" className="row-action-button" onClick={() => onAskAi(`把「${item.title}」（${item.id}）调整一下`)}>调</button>
+            ? <button type="button" className="row-action-button" data-ui-role="button" data-ui-variant="secondary" data-ui-action="affair-adjust" onClick={() => onAskAi(`把「${item.title}」（${item.id}）调整一下`)}>调时间</button>
             : <button type="button" className="row-action-button quiet-danger" onClick={() => onPrepare({ operation: 'affair_cancel', id: item.id, expectedVersion: item.version })}>取消…</button>}
       </>}
     </div>}
@@ -3578,12 +3579,14 @@ function WorkbenchNav({ label, items, value, onChange, busy }: {
   onChange: (id: string) => void;
   busy?: boolean;
 }) {
-  return <nav className="workbench-nav" aria-label={label}>
+  return <nav className="workbench-nav" aria-label={label} data-ui="segmented-navigation">
     {items.map((item) => (
       <button
         type="button"
         key={item.id}
         className={value === item.id ? 'selected' : ''}
+        data-ui-role="nav-item"
+        data-ui-id={`secondary-nav-${item.id}`}
         aria-label={`${item.label}${item.count ? `，${item.count} 项` : ''}`}
         aria-pressed={value === item.id}
         disabled={busy}
@@ -3752,7 +3755,7 @@ function CompactItem({ item, onInspect, onPrepare, onQuick, onAskAi, onRetry, re
 }
 
 function Status({ value }: { value: string }) {
-  return <span className={`status ${statusTone(value)}`}>{statusLabels[value] || value}</span>;
+  return <span className={`status ${statusTone(value)}`} data-ui="status-badge" data-ui-state={statusTone(value)}>{statusLabels[value] || value}</span>;
 }
 
 function PanelHeading({ title, meta, action, onAction, actionDisabled }: {
@@ -3763,15 +3766,15 @@ function PanelHeading({ title, meta, action, onAction, actionDisabled }: {
   actionDisabled?: boolean;
 }) {
   return (
-    <div className="panel-heading">
+    <div className="panel-heading" data-ui="section-heading">
       <div><h3>{title}</h3>{meta && <span>{meta}</span>}</div>
-      {action && <button type="button" onClick={onAction} disabled={actionDisabled}>{action}</button>}
+      {action && <button type="button" data-ui-role="button" data-ui-variant="secondary" onClick={onAction} disabled={actionDisabled}>{action}</button>}
     </div>
   );
 }
 
 function PageTitle({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
-  return <header className="page-title"><p className="eyebrow">{eyebrow}</p><h2>{title}</h2><p>{description}</p></header>;
+  return <header className="page-title" data-ui="page-title"><p className="eyebrow">{eyebrow}</p><h2>{title}</h2><p>{description}</p></header>;
 }
 
 function Field({ name, label, type = 'text', placeholder, defaultValue, required = false }: { name: string; label: string; type?: string; placeholder?: string; defaultValue?: string | number; required?: boolean }) {
@@ -3783,11 +3786,11 @@ function Check({ label, ok, detail }: { label: string; ok: boolean; detail: stri
 }
 
 function Empty({ title, text, compact = false }: { title: string; text: string; compact?: boolean }) {
-  return <div className={compact ? 'empty compact' : 'empty'}><strong>{title}</strong><span>{text}</span></div>;
+  return <div className={compact ? 'empty compact' : 'empty'} data-ui="empty-state"><strong>{title}</strong><span>{text}</span></div>;
 }
 
 function Notice({ tone, title, text }: { tone: string; title: string; text: string }) {
-  return <div className={`notice ${tone}`} role={tone === 'error' ? 'alert' : 'status'}><strong>{title}</strong><span>{text}</span></div>;
+  return <div className={`notice ${tone}`} data-ui="notice" data-ui-state={tone} role={tone === 'error' ? 'alert' : 'status'}><strong>{title}</strong><span>{text}</span></div>;
 }
 
 function LoadingState() {

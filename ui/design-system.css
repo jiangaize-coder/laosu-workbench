@@ -1,0 +1,446 @@
+/*
+ * 课务台 Visual ID v2.12
+ * 只负责视觉身份、组件角色与状态语义；不得承载业务逻辑。
+ * 本文件始终在 panel.css 之后加载，用一套 token 收口历史样式。
+ */
+
+.workbench-theme {
+  /* 品牌与语义色：品牌色固定为鼠尾草绿，不继承宿主蓝色 accent。 */
+  --wb-brand: #547362;
+  --wb-brand-strong: #405d4d;
+  --wb-brand-soft: color-mix(in srgb, var(--wb-brand) 12%, transparent);
+  --wb-confirmed: #5f956f;
+  --wb-pending: #c08a48;
+  --wb-error: #b96b59;
+  --wb-finished: #6e8290;
+  --wb-neutral: #878d89;
+  --wb-temporary: #668ca8;
+  --wb-white: #ffffff;
+
+  /* 兼容旧类名：旧页面全部映射到同一套 Visual ID。 */
+  --wb-accent: var(--wb-brand);
+  --wb-accent-soft: var(--wb-brand-soft);
+  --wb-state-confirmed: var(--wb-confirmed);
+  --wb-state-pending: var(--wb-pending);
+  --wb-state-error: var(--wb-error);
+  --wb-state-finished: var(--wb-finished);
+  --wb-state-neutral: var(--wb-neutral);
+  --wb-kind-temporary: var(--wb-temporary);
+
+  /* 表面层级。 */
+  --wb-surface: color-mix(in srgb, var(--wb-card) 88%, var(--wb-bg));
+  --wb-surface-soft: color-mix(in srgb, var(--wb-text) 4.5%, var(--wb-card));
+  --wb-surface-strong: color-mix(in srgb, var(--wb-text) 7.5%, var(--wb-card));
+  --wb-surface-brand: color-mix(in srgb, var(--wb-brand) 8%, var(--wb-card));
+  --wb-overlay: color-mix(in srgb, var(--wb-text) 20%, transparent);
+
+  /* 尺寸、圆角、阴影、排版。 */
+  --wb-radius-xs: 6px;
+  --wb-radius-sm: 8px;
+  --wb-radius-md: 12px;
+  --wb-radius-lg: 16px;
+  --wb-radius-pill: 999px;
+  --wb-control-compact: 30px;
+  --wb-control-default: 36px;
+  --wb-control-prominent: 40px;
+  --wb-shadow-card: 0 8px 24px color-mix(in srgb, var(--wb-text) 5%, transparent);
+  --wb-shadow-float: 0 18px 52px color-mix(in srgb, var(--wb-text) 16%, transparent);
+  --wb-type-micro: 10.5px;
+  --wb-type-caption: 11.5px;
+  --wb-type-label: 12.5px;
+  --wb-type-body: 14px;
+  --wb-type-control: 13px;
+  --wb-leading-tight: 1.35;
+  --wb-leading-body: 1.58;
+  --wb-shadow: var(--wb-shadow-card);
+}
+
+/* ── 全局排版 ID ── */
+.workbench-shell {
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: var(--wb-type-body);
+  line-height: var(--wb-leading-body);
+  color: var(--wb-text);
+}
+
+.workbench-shell :where(h1, h2, h3, h4, p) { text-wrap: pretty; }
+.workbench-shell :where(button, input, select, textarea) { font: inherit; letter-spacing: normal; }
+.workbench-shell :where(time, code, .metric-card > strong, .next-course-time strong) { font-variant-numeric: tabular-nums; }
+
+.workbench-theme :is(.page-title, .hero-row) h2 {
+  margin: 0;
+  color: var(--wb-text);
+  font-size: clamp(22px, 2.4vw, 30px);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -.018em;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--wb-brand);
+  font-size: var(--wb-type-micro);
+  font-weight: 720;
+  line-height: var(--wb-leading-tight);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.workbench-theme :is(.subtle, .page-title > p:last-child, .muted-note, .updated-at) {
+  color: var(--wb-muted);
+  font-size: var(--wb-type-caption);
+  font-weight: 540;
+  line-height: 1.55;
+}
+
+.workbench-theme :is(.panel-heading h3, .planning-panel-head h3, .planning-week-toolbar h3) {
+  color: var(--wb-text);
+  font-size: var(--wb-type-body);
+  font-weight: 700;
+  line-height: var(--wb-leading-tight);
+}
+
+.workbench-theme :is(.panel-heading span, .row-main span, .course-main p, .compact-item span, .affair-card-meta, .reservation-main small) {
+  color: var(--wb-muted);
+  font-size: var(--wb-type-caption);
+  font-weight: 540;
+  line-height: 1.48;
+}
+
+/* ── 表面与容器 ID ── */
+.workbench-theme :is(
+  .panel,
+  .metric-card,
+  .next-course-banner,
+  .day-complete-bar,
+  .planning-week-panel,
+  .affair-card,
+  .context-item-card,
+  .preview-summary,
+  .ai-workspace,
+  .manual-operations
+) {
+  border: 0;
+  border-radius: var(--wb-radius-lg);
+  background: var(--wb-surface);
+  box-shadow: var(--wb-shadow-card);
+}
+
+.workbench-theme :is(.panel, .planning-week-panel, .ai-workspace) { padding: 16px; }
+.workbench-theme :is(.ai-conversation-column, .ai-result-column, .availability-grid > section, .plan-move-row) {
+  border: 0;
+  border-radius: var(--wb-radius-md);
+  background: var(--wb-surface-soft);
+}
+
+.workbench-theme :is(.day-group, .timeline-row, .compact-item, .quick-pending-item, .affair-row, .reservation-card, .planning-student-row, .review-card) {
+  border: 0;
+  border-radius: var(--wb-radius-md);
+}
+
+/* ── 一级、二级导航 ID ── */
+.tabbar,
+.workbench-nav,
+.scope-switch,
+.planning-subnav,
+.planning-filter,
+.planning-week-mode,
+.planning-week-nav {
+  border: 0;
+  border-radius: var(--wb-radius-md);
+  background: var(--wb-surface-soft);
+  box-shadow: none;
+}
+
+.workbench-theme :is(.tab, .workbench-nav button, .scope-switch button, .planning-subnav button, .planning-filter button, .planning-week-mode button) {
+  min-height: var(--wb-control-default);
+  border: 0;
+  border-radius: var(--wb-radius-sm);
+  background: transparent;
+  color: var(--wb-muted);
+  box-shadow: none;
+  font-size: var(--wb-type-label);
+  font-weight: 620;
+}
+
+.workbench-theme :is(.tab, .workbench-nav button, .scope-switch button, .planning-subnav button, .planning-filter button, .planning-week-mode button):hover:not(:disabled) {
+  color: var(--wb-text);
+  background: color-mix(in srgb, var(--wb-card) 72%, transparent);
+}
+
+.workbench-theme :is(.tab.active, .workbench-nav button.selected, .scope-switch button.selected, .planning-subnav button.selected, .planning-filter button.selected, .planning-week-mode button.selected) {
+  color: var(--wb-brand-strong);
+  background: var(--wb-card);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--wb-text) 7%, transparent);
+  font-weight: 700;
+}
+
+.workbench-nav button strong,
+.planning-subnav strong {
+  border-radius: var(--wb-radius-pill);
+  background: color-mix(in srgb, var(--wb-pending) 15%, transparent);
+  color: color-mix(in srgb, var(--wb-pending) 78%, var(--wb-text));
+}
+
+/* ── 按钮 ID：primary / secondary / danger / quiet / icon 五类 ── */
+.workbench-shell button {
+  appearance: none;
+  border: 0;
+  box-shadow: none;
+  font-weight: 640;
+  transition: background-color .12s ease, color .12s ease, opacity .12s ease, filter .12s ease, transform .12s ease;
+}
+
+.workbench-theme :is(
+  .primary-button,
+  .danger-button,
+  .row-action-button,
+  .affair-do,
+  .item-action-buttons button,
+  .planning-row-actions button,
+  .reservation-actions button,
+  .review-card button,
+  .route-fix-button,
+  .quick-pending-item button,
+  .affair-record-actions button
+) {
+  min-height: var(--wb-control-default);
+  border-radius: var(--wb-radius-sm);
+  padding: 7px 11px;
+  font-size: var(--wb-type-caption);
+  font-weight: 650;
+}
+
+.workbench-theme :is(.primary-button, .row-action-button.primary, .affair-do.primary, .item-action-buttons button.primary, .reservation-actions button.primary) {
+  background: var(--wb-brand);
+  color: var(--wb-white);
+}
+
+.workbench-theme :is(.secondary, .row-action-button, .affair-do.secondary, .item-action-buttons button.secondary, .planning-row-actions button, .reservation-actions button:not(.primary):not(.quiet-danger), .review-card button, .route-fix-button) {
+  background: var(--wb-surface-strong);
+  color: var(--wb-text);
+}
+
+.workbench-theme :is(.danger-button, .danger, .affair-do.danger, .item-action-buttons button.danger) {
+  background: color-mix(in srgb, var(--wb-error) 13%, transparent);
+  color: color-mix(in srgb, var(--wb-error) 80%, var(--wb-text));
+}
+
+.workbench-theme :is(.quiet-danger, .affair-do.quiet) {
+  background: transparent;
+  color: var(--wb-muted);
+}
+.workbench-theme :is(.quiet-danger, .affair-do.quiet):hover:not(:disabled) { color: var(--wb-error); }
+
+.workbench-theme :is(.icon-button, .context-back, .drawer-close) {
+  width: var(--wb-control-default);
+  height: var(--wb-control-default);
+  min-height: var(--wb-control-default);
+  padding: 0;
+  border-radius: var(--wb-radius-sm);
+  background: var(--wb-surface-strong);
+  color: var(--wb-text);
+}
+.health-button {
+  width: auto;
+  min-height: var(--wb-control-default);
+  padding: 6px 8px;
+  border-radius: var(--wb-radius-sm);
+  background: transparent;
+  color: var(--wb-muted);
+}
+
+.ai-action-button {
+  min-height: var(--wb-control-default);
+  border-radius: var(--wb-radius-sm);
+  padding: 7px 11px;
+  background: var(--wb-brand-soft);
+  color: var(--wb-brand-strong);
+  font-size: var(--wb-type-caption);
+  font-weight: 680;
+}
+.ai-action-button.active { background: var(--wb-brand); color: var(--wb-white); }
+
+.workbench-theme :is(.primary-button, .secondary, .danger-button, .danger, .row-action-button, .affair-do, .item-action-buttons button, .ai-action-button):hover:not(:disabled) {
+  filter: brightness(.97);
+}
+.workbench-theme :is(.primary-button, .ai-action-button):active:not(:disabled) { transform: translateY(1px); }
+.workbench-shell button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.workbench-shell button[aria-busy="true"] { cursor: progress; }
+
+.item-action-buttons,
+.planning-week-inline-buttons { gap: 5px; }
+.item-action-buttons button,
+.planning-week-inline-action button { min-height: var(--wb-control-compact); }
+
+/* 建议处理属于轻量决策，统一为浅绿章；“收起”保持幽灵文字。 */
+.quick-pending-item button:is(.primary, .secondary) {
+  background: color-mix(in srgb, var(--wb-brand) 13%, var(--wb-card));
+  color: var(--wb-brand-strong);
+}
+.quick-pending-item button.primary { background: color-mix(in srgb, var(--wb-brand) 18%, var(--wb-card)); }
+.quick-pending-item button.quiet-danger { background: transparent; color: var(--wb-muted); }
+
+.workbench-theme :is(
+  .ghost-button,
+  .panel-heading button,
+  .planning-overview-actions button,
+  .planning-day-page-nav button,
+  .ai-example-row button,
+  .ai-option-row button,
+  .cockpit-card-ai,
+  .ai-mic
+) {
+  min-height: var(--wb-control-compact);
+  border: 0;
+  border-radius: var(--wb-radius-sm);
+  padding: 6px 10px;
+  background: var(--wb-surface-strong);
+  color: var(--wb-text);
+  font-size: var(--wb-type-caption);
+  font-weight: 640;
+}
+.workbench-theme :is(.ai-example-row button, .ai-option-row button) { border-radius: var(--wb-radius-pill); }
+.workbench-theme .cockpit-gap { border: 0; border-radius: var(--wb-radius-sm); background: var(--wb-surface-soft); color: var(--wb-muted); }
+
+/* ── 表单 ID ── */
+.workbench-theme :is(.field input, .field select, .operation-form select, .plan-move-row input, .plan-move-row select, .ai-composer textarea) {
+  min-height: var(--wb-control-prominent);
+  border: 0;
+  border-radius: var(--wb-radius-sm);
+  background: var(--wb-surface-strong);
+  color: var(--wb-text);
+  font-size: var(--wb-type-control);
+  line-height: 1.45;
+}
+
+.workbench-theme :is(.field input, .field select, .operation-form select, .plan-move-row input, .plan-move-row select, .ai-composer textarea):focus {
+  outline: 2px solid color-mix(in srgb, var(--wb-brand) 52%, transparent);
+  outline-offset: 1px;
+  box-shadow: none;
+}
+
+/* ── 状态 ID：颜色只表达状态；蓝点只表达临时身份。 ── */
+.status {
+  border: 0;
+  border-radius: var(--wb-radius-pill);
+  padding: 4px 8px;
+  font-size: var(--wb-type-micro);
+  font-weight: 680;
+}
+
+.workbench-theme :is(.status.active, .status.warn, .state-pending .status) {
+  background: color-mix(in srgb, var(--wb-pending) 13%, transparent);
+  color: color-mix(in srgb, var(--wb-pending) 82%, var(--wb-text));
+}
+.workbench-theme :is(.status.done, .state-confirmed .status) {
+  background: color-mix(in srgb, var(--wb-confirmed) 12%, transparent);
+  color: color-mix(in srgb, var(--wb-confirmed) 82%, var(--wb-text));
+}
+.workbench-theme :is(.status.error, .state-error .status) {
+  background: color-mix(in srgb, var(--wb-error) 13%, transparent);
+  color: color-mix(in srgb, var(--wb-error) 82%, var(--wb-text));
+}
+.workbench-theme :is(.status.finished, .state-finished .status) {
+  background: color-mix(in srgb, var(--wb-finished) 13%, transparent);
+  color: color-mix(in srgb, var(--wb-finished) 82%, var(--wb-text));
+}
+.workbench-theme :is(.status.muted, .state-neutral .status) {
+  background: color-mix(in srgb, var(--wb-neutral) 10%, transparent);
+  color: var(--wb-muted);
+}
+
+.workbench-theme :is(.state-confirmed, .planning-week-block.confirmed, .planning-week-block.landed) { --card-state: var(--wb-confirmed); }
+.workbench-theme :is(.state-pending, .planning-week-block.pending, .planning-week-block.unconfirmed, .planning-week-block.expected) { --card-state: var(--wb-pending); }
+.workbench-theme :is(.state-error, .planning-week-block.blocked) { --card-state: var(--wb-error); }
+.workbench-theme :is(.state-finished) { --card-state: var(--wb-finished); }
+.workbench-theme :is(.state-neutral, .planning-week-block.paused) { --card-state: var(--wb-neutral); }
+
+.workbench-theme :is(.week-time-block, .planning-week-block, .context-item-card, .reservation-card, .affair-card) {
+  border: 0;
+  background: color-mix(in srgb, var(--card-state, var(--wb-neutral)) 14%, var(--wb-card));
+}
+
+.workbench-theme :is(.week-time-block.temporary, .planning-week-block.reservation, .timeline-row.temporary) { --identity-color: var(--wb-temporary); }
+.workbench-theme :is(.week-time-block.temporary, .planning-week-block.reservation)::after {
+  background: var(--wb-temporary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--wb-card) 80%, transparent);
+}
+
+/* ── 通知、反馈、图例 ID ── */
+.notice {
+  border: 0;
+  border-radius: var(--wb-radius-md);
+  padding: 11px 13px;
+  font-size: var(--wb-type-caption);
+  font-weight: 540;
+}
+.notice.error { background: color-mix(in srgb, var(--wb-error) 11%, transparent); color: color-mix(in srgb, var(--wb-error) 84%, var(--wb-text)); }
+.notice.warn { background: color-mix(in srgb, var(--wb-pending) 12%, transparent); color: color-mix(in srgb, var(--wb-pending) 84%, var(--wb-text)); }
+.workbench-theme :is(.inline-result.ok, .course-feedback.ok, .context-feedback.ok) { color: color-mix(in srgb, var(--wb-confirmed) 84%, var(--wb-text)); }
+.workbench-theme :is(.inline-result.error, .course-feedback.error, .context-feedback.error) { color: color-mix(in srgb, var(--wb-error) 84%, var(--wb-text)); }
+
+.calendar-legend > span,
+.source-status-list span,
+.preview-op-badge,
+.temporary-badge {
+  border: 0;
+  border-radius: var(--wb-radius-pill);
+  background: var(--wb-surface-soft);
+  color: var(--wb-text);
+  font-size: var(--wb-type-micro);
+  font-weight: 650;
+}
+
+.health.good i { background: var(--wb-confirmed); box-shadow: 0 0 0 4px color-mix(in srgb, var(--wb-confirmed) 12%, transparent); }
+.health.bad i { background: var(--wb-error); box-shadow: 0 0 0 4px color-mix(in srgb, var(--wb-error) 12%, transparent); }
+.affair-icon { background: color-mix(in srgb, var(--wb-pending) 12%, transparent); color: color-mix(in srgb, var(--wb-pending) 78%, var(--wb-text)); }
+.commute-chip.tight { background: color-mix(in srgb, var(--wb-error) 10%, transparent); color: color-mix(in srgb, var(--wb-error) 78%, var(--wb-text)); }
+.context-domain.affair { background: color-mix(in srgb, var(--wb-pending) 12%, transparent); color: color-mix(in srgb, var(--wb-pending) 78%, var(--wb-text)); }
+.calendar-diff-summary span { background: var(--wb-surface-soft); color: var(--wb-text); }
+.calendar-diff-summary .diff-badge-danger { background: color-mix(in srgb, var(--wb-error) 13%, transparent); color: color-mix(in srgb, var(--wb-error) 82%, var(--wb-text)); }
+.calendar-diff-row { background: color-mix(in srgb, var(--wb-error) 9%, transparent); color: var(--wb-text); }
+.version-row { border-bottom-color: var(--wb-border); }
+.workbench-theme .cockpit-day { border: 0; background: var(--wb-surface); box-shadow: var(--wb-shadow-card); }
+.workbench-theme .cockpit-unassigned { background: color-mix(in srgb, var(--wb-pending) 10%, var(--wb-card)); }
+
+/* ── 抽屉与浮层 ID ── */
+.workbench-theme :is(.context-drawer-backdrop, .action-drawer-backdrop) { background: var(--wb-overlay); }
+.workbench-theme :is(.context-drawer, .action-drawer) {
+  border: 0;
+  background: var(--wb-bg);
+  box-shadow: var(--wb-shadow-float);
+}
+.workbench-theme :is(.context-drawer-head, .action-drawer-head) {
+  border: 0;
+  background: var(--wb-surface);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--wb-text) 5%, transparent);
+}
+
+/* ── 可访问性与触屏 ── */
+.workbench-shell :where(button, [role="button"]):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--wb-brand) 62%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .workbench-theme {
+    --wb-type-micro: 11.5px;
+    --wb-type-caption: 12.5px;
+    --wb-type-label: 13.5px;
+    --wb-type-body: 15px;
+    --wb-type-control: 14px;
+  }
+  .workbench-theme :is(.tab, .workbench-nav button, .scope-switch button, .planning-subnav button, .planning-filter button, .planning-week-mode button) { min-height: 44px; }
+  .workbench-theme :is(.primary-button, .danger-button, .row-action-button, .affair-do, .item-action-buttons button, .planning-row-actions button, .reservation-actions button, .review-card button, .route-fix-button) { min-height: 44px; }
+  .workbench-theme :is(.icon-button, .context-back, .drawer-close) { width: 44px; height: 44px; min-height: 44px; }
+  .workbench-theme .health-button { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workbench-shell *, .workbench-shell *::before, .workbench-shell *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

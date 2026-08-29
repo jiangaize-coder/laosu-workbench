@@ -9,7 +9,7 @@ const routes = readFileSync(new URL('../routes/ui.js', import.meta.url), 'utf8')
 
 test('pending planning cards expose both actions directly on hover or focus', () => {
   assert.match(panel, /\{canAct && <div className="planning-week-inline-action"/);
-  assert.match(panel, /AI 调时间<\/button>/);
+  assert.match(panel, />调时间<\/button>/);
   assert.match(panel, /'确认落课'/);
   assert.match(css, /planning-week-block\.actionable:hover \.planning-week-inline-action/);
   assert.match(css, /planning-week-block\.actionable:focus-within \.planning-week-inline-action/);
@@ -45,7 +45,7 @@ test('overview and affair cards share contextual two-action mappings', () => {
 
 test('refreshing content is inert and custom buttons prevent Space from scrolling', () => {
   assert.match(panel, /inert=\{loading && Boolean\(dashboard\)\}/);
-  const customButtons = panel.match(/role="button"/g) || [];
+  const customButtons = panel.match(/\srole="button"/g) || [];
   const preventedActivations = panel.match(/event\.preventDefault\(\);/g) || [];
   assert.ok(customButtons.length >= 4);
   assert.ok(preventedActivations.length >= customButtons.length);

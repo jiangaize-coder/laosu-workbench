@@ -26,10 +26,9 @@ body {
   --wb-card: var(--hana-plugin-bg-card, var(--bg-card, rgba(255,255,255,.72)));
   --wb-text: var(--hana-plugin-text, var(--text, #29312d));
   --wb-muted: var(--hana-plugin-text-muted, var(--text-muted, #747b75));
-  /* 配色基准：全站强调色固定为鼠尾草绿，不继承宿主的蓝色 accent */
+  /* 配色基准：全站强调色固定为鼠尾草绿；最终语义映射由 design-system.css 统一管理。 */
   --wb-accent: #547362;
   --wb-border: var(--hana-plugin-border, var(--border, rgba(63,77,67,.14)));
-  --wb-accent: var(--hana-plugin-accent, var(--accent, #547362));
   --wb-accent-soft: color-mix(in srgb, var(--wb-accent) 13%, transparent);
   --wb-state-confirmed: #5f956f;
   --wb-state-pending: #c08a48;
