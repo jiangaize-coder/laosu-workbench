@@ -26,6 +26,8 @@ body {
   --wb-card: var(--hana-plugin-bg-card, var(--bg-card, rgba(255,255,255,.72)));
   --wb-text: var(--hana-plugin-text, var(--text, #29312d));
   --wb-muted: var(--hana-plugin-text-muted, var(--text-muted, #747b75));
+  /* 配色基准：全站强调色固定为鼠尾草绿，不继承宿主的蓝色 accent */
+  --wb-accent: #547362;
   --wb-border: var(--hana-plugin-border, var(--border, rgba(63,77,67,.14)));
   --wb-accent: var(--hana-plugin-accent, var(--accent, #547362));
   --wb-accent-soft: color-mix(in srgb, var(--wb-accent) 13%, transparent);
@@ -1834,3 +1836,14 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
 /* ── AI 语音输入 ── */
 .ai-mic { appearance: none; border: 0; border-radius: 10px; padding: 8px 12px; background: var(--wb-surface-soft); color: var(--wb-text); font: inherit; font-size: 12px; font-weight: 640; cursor: pointer; }
 .ai-mic.listening { background: color-mix(in srgb, var(--wb-state-error) 14%, transparent); color: var(--wb-state-error); }
+
+/* ── 建议处理按钮：统一浅绿章，收起为幽灵文字（依据 2.11 实测截图） ── */
+.quick-pending-item button:is(.primary, .secondary, .quiet-danger) { background: color-mix(in srgb, var(--wb-accent) 10%, var(--wb-card)); color: color-mix(in srgb, var(--wb-accent) 76%, var(--wb-text)); }
+.quick-pending-item button.primary { background: color-mix(in srgb, var(--wb-accent) 16%, var(--wb-card)); font-weight: 680; }
+.quick-pending-item button.quiet-danger { background: transparent; color: var(--wb-muted); }
+.quick-pending-item button.quiet-danger:hover { color: var(--wb-state-error); }
+.quick-pending-item button:is(.primary, .secondary):hover { background: color-mix(in srgb, var(--wb-accent) 20%, var(--wb-card)); }
+
+/* ── 空状态瘦身：待处理为空时不再占半屏 ── */
+.pending-action-panel .empty.compact { padding: 10px 12px; }
+.overview-duo.pending-empty { grid-template-columns: minmax(0, 0.9fr) minmax(0, 2fr); }

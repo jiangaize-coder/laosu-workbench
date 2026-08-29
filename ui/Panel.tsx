@@ -1298,7 +1298,7 @@ function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepar
         description="数据来自排课与事务系统实时回读。"
       />
 
-      <div className="overview-duo">
+      <div className={pending.length ? 'overview-duo' : 'overview-duo pending-empty'}>
           <div className="panel pending-action-panel">
             <PanelHeading title="待处理" meta={`${pending.length} 项`} />
             {pending.length ? pending.slice(0, 4).map((item) => <QuickPendingItem key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} onRetryPrev={onRetryPrev} retryingId={retryingId} feedback={affairFeedback[item.id]} />) : <Empty title="没有待处理事务" text="当前队列是干净的。" compact />}

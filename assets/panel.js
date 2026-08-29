@@ -11857,7 +11857,7 @@ function Gg({ dashboard: s, pending: o, upcoming: d, onInspect: f, onOpenDay: _,
         description: "数据来自排课与事务系统实时回读。"
       }
     ),
-    /* @__PURE__ */ n.jsxs("div", { className: "overview-duo", children: [
+    /* @__PURE__ */ n.jsxs("div", { className: o.length ? "overview-duo" : "overview-duo pending-empty", children: [
       /* @__PURE__ */ n.jsxs("div", { className: "panel pending-action-panel", children: [
         /* @__PURE__ */ n.jsx(Yt, { title: "待处理", meta: `${o.length} 项` }),
         o.length ? o.slice(0, 4).map((Z) => /* @__PURE__ */ n.jsx(fv, { item: Z, onInspect: f, onPrepare: N, onQuick: b, onAskAi: D, onRetry: S, onRetryPrev: p, retryingId: E, feedback: z[Z.id] }, Z.id)) : /* @__PURE__ */ n.jsx(ha, { title: "没有待处理事务", text: "当前队列是干净的。", compact: !0 })
