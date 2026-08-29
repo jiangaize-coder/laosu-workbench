@@ -9,7 +9,7 @@ const routes = readFileSync(new URL('../routes/ui.js', import.meta.url), 'utf8')
 
 test('pending planning cards expose both actions directly on hover or focus', () => {
   assert.match(panel, /\{canAct && <div className="planning-week-inline-action"/);
-  assert.match(panel, />调整时间<\/button>/);
+  assert.match(panel, /AI 调时间<\/button>/);
   assert.match(panel, /'确认落课'/);
   assert.match(css, /planning-week-block\.actionable:hover \.planning-week-inline-action/);
   assert.match(css, /planning-week-block\.actionable:focus-within \.planning-week-inline-action/);
@@ -35,7 +35,7 @@ test('overview and affair cards share contextual two-action mappings', () => {
   assert.match(panel, /onQuick\?\.\('affairComplete', item\)/);
   assert.match(panel, />本次不上<\/button>/);
   assert.match(panel, /'没约上'/);
-  assert.match(panel, /调整时间…<\/button>/);
+  assert.match(panel, /的这节课调一下时间/);
   assert.match(panel, /week-card-inline-action/);
   assert.match(panel, /affair-row-inline-action/);
   assert.match(panel, /quick-pending-inline-action/);

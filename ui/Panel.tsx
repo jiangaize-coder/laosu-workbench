@@ -1180,10 +1180,10 @@ function Panel() {
           </section>}
           <div className={loading && dashboard ? 'view-content scope-loading' : 'view-content'} aria-busy={loading && Boolean(dashboard)} inert={loading && Boolean(dashboard)}>
             {dashboard && tab === 'overview' && (
-              <Overview dashboard={dashboard} pending={activePending} upcoming={upcoming} onInspect={openItemDetail} onOpenDay={openDayDetail} onPrepare={openAction} onRetry={handleAffairRetry} onRetryPrev={handleAffairRetryPrev} retryingId={quickBusyId} affairFeedback={affairFeedback} onDayComplete={handleDayComplete} dayBusy={dayCompleteBusy} dayFeedback={dayCompleteFeedback} onNavigate={navigateWithSection} onQuick={handleQuick} onDataChanged={refreshCurrent} />
+              <Overview dashboard={dashboard} pending={activePending} upcoming={upcoming} onInspect={openItemDetail} onOpenDay={openDayDetail} onPrepare={openAction} onRetry={handleAffairRetry} onRetryPrev={handleAffairRetryPrev} retryingId={quickBusyId} affairFeedback={affairFeedback} onDayComplete={handleDayComplete} dayBusy={dayCompleteBusy} dayFeedback={dayCompleteFeedback} onNavigate={navigateWithSection} onQuick={handleQuick} onAskAi={openAiWithDraft} onDataChanged={refreshCurrent} />
             )}
             {tab === 'planning' && <PlanningView onAction={openAction} onAskAi={openAiWithDraft} refreshKey={planningRevision} sectionHint={planningSectionHint} scheduleText={dashboard?.scheduleText} onDataChanged={refreshCurrent} />}
-            {tab === 'affairs' && <AffairsView onQuick={handleQuick} onPrepare={openAction} onInspect={openItemDetail} onRetry={handleAffairRetry} onRetryPrev={handleAffairRetryPrev} retryingId={quickBusyId} feedback={affairFeedback} refreshKey={planningRevision} observedAt={dashboard?.observedAt ?? ''} onOpenDay={(date, items, trigger) => openDayDetail(date, trigger, items)} localDate={dashboard?.localDate} />}
+            {tab === 'affairs' && <AffairsView onQuick={handleQuick} onAskAi={openAiWithDraft} onPrepare={openAction} onInspect={openItemDetail} onRetry={handleAffairRetry} onRetryPrev={handleAffairRetryPrev} retryingId={quickBusyId} feedback={affairFeedback} refreshKey={planningRevision} observedAt={dashboard?.observedAt ?? ''} onOpenDay={(date, items, trigger) => openDayDetail(date, trigger, items)} localDate={dashboard?.localDate} />}
           </div>
         </main>
 
@@ -1202,6 +1202,7 @@ function Panel() {
                 view={contextView}
                 dashboard={dashboard}
                 onQuick={handleQuick}
+                onAskAi={openAiWithDraft}
                 onPrepare={openAction}
                 onRetry={handleAffairRetry}
                 onRetryPrev={handleAffairRetryPrev}
@@ -1242,7 +1243,7 @@ function Panel() {
   );
 }
 
-function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepare, onQuick, onRetry, onRetryPrev, retryingId, affairFeedback, onDayComplete, dayBusy, dayFeedback, onNavigate, onDataChanged }: {
+function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepare, onQuick, onAskAi, onRetry, onRetryPrev, retryingId, affairFeedback, onDayComplete, dayBusy, dayFeedback, onNavigate, onDataChanged }: {
   dashboard: Dashboard;
   pending: TimelineItem[];
   upcoming: TimelineItem | null;
@@ -1258,6 +1259,7 @@ function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepar
   dayFeedback: AffairFeedback | null;
   onNavigate: (tab: Tab, section?: string) => void;
   onQuick: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
+  onAskAi: (draft: string) => void;
   onDataChanged: (options?: { silent?: boolean }) => Promise<unknown>;
 }) {
   const combinedItems = useMemo(() => {
@@ -1299,7 +1301,7 @@ function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepar
       <div className="overview-duo">
           <div className="panel pending-action-panel">
             <PanelHeading title="待处理" meta={`${pending.length} 项`} />
-            {pending.length ? pending.slice(0, 4).map((item) => <QuickPendingItem key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onRetry={onRetry} onRetryPrev={onRetryPrev} retryingId={retryingId} feedback={affairFeedback[item.id]} />) : <Empty title="没有待处理事务" text="当前队列是干净的。" compact />}
+            {pending.length ? pending.slice(0, 4).map((item) => <QuickPendingItem key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} onRetryPrev={onRetryPrev} retryingId={retryingId} feedback={affairFeedback[item.id]} />) : <Empty title="没有待处理事务" text="当前队列是干净的。" compact />}
           </div>
           <SuggestionCards observedAt={dashboard.observedAt} onPrepare={onPrepare} onOpenDay={onOpenDay} onNavigate={onNavigate} onRetry={onRetry} onDataChanged={onDataChanged} />
       </div>
@@ -1309,7 +1311,7 @@ function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepar
 
 
 
-<NextCourseBanner course={dashboard.nextCourse || null} advice={dashboard.commuteAdvice || null} onOpen={(trigger) => dashboard.nextCourse && onInspect(dashboard.nextCourse, trigger)} onPrepare={onPrepare} onQuick={onQuick} />
+<NextCourseBanner course={dashboard.nextCourse || null} advice={dashboard.commuteAdvice || null} onOpen={(trigger) => dashboard.nextCourse && onInspect(dashboard.nextCourse, trigger)} onPrepare={onPrepare} onQuick={onQuick} onAskAi={onAskAi} />
       {dashboard.scope === 'today' && todayCourses.length > 0 && <section className="day-complete-bar">
         <div>
           <p className="eyebrow">今日收课</p>
@@ -1345,7 +1347,7 @@ function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepar
             <small>石板色=上过课留痕；过期未标记的课程以琥珀“过期”提示，待补标记</small>
           </div>}
           {dashboard.scope === 'week'
-            ? <WeekCalendar items={combinedItems} range={dashboard.range} localDate={dashboard.localDate} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onRetry={onRetry} retryingId={retryingId} affairFeedback={affairFeedback} />
+            ? <WeekCalendar items={combinedItems} range={dashboard.range} localDate={dashboard.localDate} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} retryingId={retryingId} affairFeedback={affairFeedback} />
             : dashboard.scope === 'month'
               ? <MonthCalendar items={combinedItems} range={dashboard.range} localDate={dashboard.localDate} onOpenDay={onOpenDay} />
               : groups.length ? groups.map(([date, items]) => (
@@ -1355,7 +1357,7 @@ function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepar
                     <span>{items.length} 项</span>
                   </div>
                   <div className="timeline-list">
-                    {items.map((item) => <TimelineRow key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onRetry={onRetry} retryingId={retryingId} feedback={affairFeedback[item.id]} />)}
+                    {items.map((item) => <TimelineRow key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} retryingId={retryingId} feedback={affairFeedback[item.id]} />)}
                   </div>
                 </div>
               )) : <Empty title="这个范围没有安排" text="可以切换时间范围，或用 AI 操作创建和调整。" />}
@@ -1523,9 +1525,10 @@ function SuggestionCards({ observedAt, onPrepare, onOpenDay, onNavigate, onRetry
   );
 }
 
-function ItemActionButtons({ item, onQuick, onRetry, retryingId, feedback, compact = false }: {
+function ItemActionButtons({ item, onQuick, onAskAi, onRetry, retryingId, feedback, compact = false }: {
   item: TimelineItem;
   onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
+  onAskAi?: (draft: string) => void;
   onRetry?: (item: TimelineItem) => Promise<void>;
   retryingId?: string | null;
   feedback?: AffairFeedback;
@@ -1537,9 +1540,10 @@ function ItemActionButtons({ item, onQuick, onRetry, retryingId, feedback, compa
   const time = item.start_at?.slice(11, 16);
   // 交互铁律：一到两步的事按钮点一下（内部预演+提交+回读），两步以上的事交给 AI。
   if (item.domain === 'course') {
-    if (!date || !time || !onQuick) return null;
+    if (!date || !time) return null;
     return <div className={`item-action-buttons${compact ? ' compact' : ''}`} onClick={(event) => event.stopPropagation()}>
-      <button type="button" className="danger" onClick={() => onQuick('courseCancel', item)}>本次不上</button>
+      {onAskAi && <button type="button" className="secondary" onClick={() => onAskAi(`把${item.title} ${date} ${time} 的这节课调一下时间`)}>调时间</button>}
+      {onQuick && <button type="button" className="danger" onClick={() => onQuick('courseCancel', item)}>本次不上</button>}
     </div>;
   }
   const retrying = retryingId === item.id;
@@ -1611,13 +1615,14 @@ function useHorizontalDrag() {
   return { ref, onPointerDown, onPointerMove, onPointerUp: finish, onPointerCancel: finish };
 }
 
-function WeekCalendar({ items, range, localDate, onInspect, onPrepare, onQuick, onRetry, retryingId, affairFeedback }: {
+function WeekCalendar({ items, range, localDate, onInspect, onPrepare, onQuick, onAskAi, onRetry, retryingId, affairFeedback }: {
   items: TimelineItem[];
   range: string;
   localDate: string;
   onInspect: InspectHandler;
   onPrepare: (preset: ActionPreset) => void;
   onQuick: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
+  onAskAi: (draft: string) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
   affairFeedback: Record<string, AffairFeedback>;
@@ -1738,7 +1743,7 @@ const placementsByDate = useMemo(() => {
                 >
                   <strong>{formatTime(timeValue)} · {item.title}{overdue ? '（过期）' : ''}</strong>
                   <span>{item.domain === 'course' ? `${item.duration || '—'} 分钟` : item.estimated_minutes ? `${item.estimated_minutes} 分钟 · 事务` : '事务'}</span>
-                  {actionable && <div className="week-card-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onRetry={onRetry} retryingId={retryingId} feedback={affairFeedback[item.id]} compact /></div>}
+                  {actionable && <div className="week-card-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} retryingId={retryingId} feedback={affairFeedback[item.id]} compact /></div>}
                 </article>;
               })}
             </div>;
@@ -2524,11 +2529,12 @@ function TemplateIssue({ label, count, tone, details }: { label: string; count: 
 
 const WEEK_LABEL: Record<string, string> = { mon: '周一', tue: '周二', wed: '周三', thu: '周四', fri: '周五', sat: '周六', sun: '周日' };
 
-function AffairCard({ item, onInspect, onPrepare, onQuick, onRetry, onRetryPrev, retryingId, feedback }: {
+function AffairCard({ item, onInspect, onPrepare, onQuick, onAskAi, onRetry, onRetryPrev, retryingId, feedback }: {
   item: TimelineItem;
   onInspect: InspectHandler;
   onPrepare: (preset: ActionPreset) => void;
   onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
+  onAskAi?: (draft: string) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
   onRetryPrev?: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
@@ -2586,16 +2592,19 @@ function AffairCard({ item, onInspect, onPrepare, onQuick, onRetry, onRetryPrev,
           <button type="button" className="affair-do primary" disabled={Boolean(retryingId) || feedback?.ok} onClick={() => onQuick?.('affairComplete', item)}>{feedback?.ok ? '已完成' : '完成'}</button>
           {item.retry && onRetry
             ? <button type="button" className="affair-do secondary" disabled={Boolean(retryingId) || Boolean(feedback?.ok)} aria-busy={retrying} onClick={() => void onRetry(item)}>{retrying ? '处理中…' : feedback?.buttonLabel || '没约上'}</button>
-            : <button type="button" className="affair-do quiet" onClick={() => onPrepare({ operation: 'affair_cancel', id: item.id, expectedVersion: item.version })}>取消</button>}
+            : onAskAi
+              ? <button type="button" className="affair-do secondary" onClick={() => onAskAi(`把「${item.title}」（${item.id}）调整一下`)}>调</button>
+              : <button type="button" className="affair-do quiet" onClick={() => onPrepare({ operation: 'affair_cancel', id: item.id, expectedVersion: item.version })}>取消</button>}
         </>}
       </div>
     </article>
   );
 }
 
-function AffairsView({ onPrepare, onQuick, onInspect, onRetry, onRetryPrev, retryingId, feedback, refreshKey, observedAt, onOpenDay, localDate }: {
+function AffairsView({ onPrepare, onQuick, onAskAi, onInspect, onRetry, onRetryPrev, retryingId, feedback, refreshKey, observedAt, onOpenDay, localDate }: {
   onPrepare: (preset: ActionPreset) => void;
   onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
+  onAskAi?: (draft: string) => void;
   onInspect: InspectHandler;
   onRetry: (item: TimelineItem) => Promise<void>;
   onRetryPrev?: (item: TimelineItem) => Promise<void>;
@@ -2685,7 +2694,7 @@ function AffairsView({ onPrepare, onQuick, onInspect, onRetry, onRetryPrev, retr
           ? <MonthCalendar items={affairs} range={monthRange} localDate={localDate ?? state.month + '-01'} onOpenDay={handleDayOpen} />
           : (
             <div>
-              {visible.length ? visible.map((item) => <AffairCard key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onRetry={onRetry} onRetryPrev={onRetryPrev} retryingId={retryingId} feedback={feedback[item.id]} />) : <Empty title={emptyCopy.title} text={emptyCopy.text} />}
+              {visible.length ? visible.map((item) => <AffairCard key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} onRetryPrev={onRetryPrev} retryingId={retryingId} feedback={feedback[item.id]} />) : <Empty title={emptyCopy.title} text={emptyCopy.text} />}
             </div>
           )}
       </>}
@@ -3191,6 +3200,31 @@ function AiActionWorkspace({ initialDraft, preview, busy, onPreview, onCommit, o
   const [thinking, setThinking] = useState(false);
   const [aiError, setAiError] = useState('');
   const [options, setOptions] = useState<string[]>([]);
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const speechSupported = typeof window !== 'undefined' && Boolean((window as any).webkitSpeechRecognition || (window as any).SpeechRecognition);
+
+  function toggleMic() {
+    const SR = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (!SR) return;
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const recognition = new SR();
+    recognition.lang = 'zh-CN';
+    recognition.interimResults = false;
+    recognition.continuous = false;
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results as ArrayLike<any>).map((result: any) => result[0].transcript).join('').trim();
+      if (transcript) setDraft((current) => (current ? `${current} ` : '') + transcript);
+    };
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+    recognitionRef.current = recognition;
+    setListening(true);
+    recognition.start();
+  }
   const aiRequestGateRef = useRef(createRequestGate());
 
   useEffect(() => () => aiRequestGateRef.current.invalidate(), []);
@@ -3296,6 +3330,7 @@ function AiActionWorkspace({ initialDraft, preview, busy, onPreview, onCommit, o
               placeholder="例如：把董同学这周日的课调到下周四晚上七点"
               rows={3}
             />
+            {speechSupported && <button type="button" className={listening ? 'ai-mic listening' : 'ai-mic'} onClick={toggleMic} aria-label={listening ? '停止语音输入' : '语音输入'} title="语音输入">{listening ? '● 录音中' : '🎙'}</button>}
             <button type="button" className="primary-button" onClick={() => void sendMessage()} disabled={!draft.trim() || thinking}>{thinking ? '正在规划…' : '让 AI 处理'}</button>
           </div>
           <p className="ai-footnote">Enter 发送，Shift + Enter 换行。AI 只生成预演，真实写入仍需你确认。</p>
@@ -3310,11 +3345,12 @@ function AiActionWorkspace({ initialDraft, preview, busy, onPreview, onCommit, o
   );
 }
 
-function ContextDrawerContent({ view, dashboard, onPrepare, onQuick, onRetry, onRetryPrev, retryingId, affairFeedback, onSync }: {
+function ContextDrawerContent({ view, dashboard, onPrepare, onQuick, onAskAi, onRetry, onRetryPrev, retryingId, affairFeedback, onSync }: {
   view: ContextView;
   dashboard: Dashboard;
   onPrepare: (preset: ActionPreset) => void;
   onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
+  onAskAi?: (draft: string) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
   onRetryPrev?: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
@@ -3334,6 +3370,7 @@ function ContextDrawerContent({ view, dashboard, onPrepare, onQuick, onRetry, on
       item={item}
       onPrepare={onPrepare}
       onQuick={onQuick}
+      onAskAi={onAskAi}
       onRetry={onRetry}
       onRetryPrev={onRetryPrev}
       retryingId={retryingId}
@@ -3342,10 +3379,11 @@ function ContextDrawerContent({ view, dashboard, onPrepare, onQuick, onRetry, on
   </div>;
 }
 
-function ContextItemCard({ item, onPrepare, onQuick, onRetry, onRetryPrev, retryingId, feedback }: {
+function ContextItemCard({ item, onPrepare, onQuick, onAskAi, onRetry, onRetryPrev, retryingId, feedback }: {
   item: TimelineItem;
   onPrepare: (preset: ActionPreset) => void;
   onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
+  onAskAi?: (draft: string) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
   onRetryPrev?: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
@@ -3364,13 +3402,15 @@ function ContextItemCard({ item, onPrepare, onQuick, onRetry, onRetryPrev, retry
     {feedback?.undo && onRetryPrev ? <button type="button" className="row-action-button" disabled={Boolean(retryingId)} onClick={() => void onRetryPrev(item)}>撤销推进</button> : null}
     {!finished && <div className="context-item-actions">
       {item.domain === 'course' ? <>
-        <button type="button" className="primary-button" onClick={() => onPrepare({ operation: 'course_move', student: item.title, fromDate: item.start_at?.slice(0, 10), fromTime: item.start_at?.slice(11, 16), toDate: item.start_at?.slice(0, 10), toTime: item.start_at?.slice(11, 16), duration: item.duration })}>调整时间…</button>
+        <button type="button" className="primary-button" onClick={() => onAskAi?.(`把${item.title} ${item.start_at?.slice(5, 10)} ${item.start_at?.slice(11, 16)} 的这节课调一下时间`)}>AI 调时间</button>
         <button type="button" className="row-action-button quiet-danger" disabled={Boolean(retryingId)} onClick={() => onQuick?.('courseCancel', item)}>本次不上</button>
       </> : <>
         <button type="button" className="primary-button" disabled={Boolean(retryingId) || feedback?.ok} onClick={() => onQuick?.('affairComplete', item)}>{feedback?.ok ? '已完成' : '完成'}</button>
         {item.retry
           ? <button type="button" className={feedback?.ok ? 'row-action-button quick-success' : 'row-action-button'} disabled={Boolean(retryingId) || Boolean(feedback?.ok)} onClick={() => void onRetry(item)}>{retryingId === item.id ? '处理中…' : feedback?.buttonLabel || '没约上'}</button>
-          : <button type="button" className="row-action-button quiet-danger" onClick={() => onPrepare({ operation: 'affair_cancel', id: item.id, expectedVersion: item.version })}>取消…</button>}
+          : onAskAi
+            ? <button type="button" className="row-action-button" onClick={() => onAskAi(`把「${item.title}」（${item.id}）调整一下`)}>调</button>
+            : <button type="button" className="row-action-button quiet-danger" onClick={() => onPrepare({ operation: 'affair_cancel', id: item.id, expectedVersion: item.version })}>取消…</button>}
       </>}
     </div>}
   </section>;
@@ -3480,7 +3520,7 @@ function SystemView({ dashboard, onSync, embedded = false }: { dashboard: Dashbo
   );
 }
 
-function NextCourseBanner({ course, advice, onOpen, onPrepare, onQuick }: { course: TimelineItem | null; advice: Dashboard['commuteAdvice']; onOpen: (trigger: HTMLElement) => void; onPrepare: (preset: ActionPreset) => void; onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void }) {
+function NextCourseBanner({ course, advice, onOpen, onPrepare, onQuick, onAskAi }: { course: TimelineItem | null; advice: Dashboard['commuteAdvice']; onOpen: (trigger: HTMLElement) => void; onPrepare: (preset: ActionPreset) => void; onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void; onAskAi?: (draft: string) => void }) {
   if (!course) {
     return <section className="next-course-banner empty-next"><div><p className="eyebrow">下一节课</p><h3>未来范围内没有课程</h3></div></section>;
   }
@@ -3516,7 +3556,7 @@ function NextCourseBanner({ course, advice, onOpen, onPrepare, onQuick }: { cour
         </>}
       </div>
       <span className="next-course-cue">查看详情 →</span>
-      <div className="next-course-inline-action"><ItemActionButtons item={course} onQuick={onQuick} /></div>
+      <div className="next-course-inline-action"><ItemActionButtons item={course} onQuick={onQuick} onAskAi={onAskAi} /></div>
     </section>
   );
 }
@@ -3561,11 +3601,12 @@ function Metric({ label, value, hint, tone }: { label: string; value: string | n
   return <div className={`metric-card ${tone}`}><span>{label}</span><strong>{value}</strong><small>{hint}</small></div>;
 }
 
-function TimelineRow({ item, onInspect, onPrepare, onQuick, onRetry, retryingId, feedback }: {
+function TimelineRow({ item, onInspect, onPrepare, onQuick, onAskAi, onRetry, retryingId, feedback }: {
   item: TimelineItem;
   onInspect?: InspectHandler;
   onPrepare?: (preset: ActionPreset) => void;
   onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
+  onAskAi?: (draft: string) => void;
   onRetry?: (item: TimelineItem) => Promise<void>;
   retryingId?: string | null;
   feedback?: AffairFeedback;
@@ -3594,16 +3635,17 @@ function TimelineRow({ item, onInspect, onPrepare, onQuick, onRetry, retryingId,
         {feedback && <InlineResult ok={feedback.ok} text={feedback.text} />}
       </div>
       <div className="timeline-actions"><Status value={item.status} /></div>
-      {actionable && (onPrepare || onQuick) && <div className="row-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>}
+      {actionable && (onPrepare || onQuick || onAskAi) && <div className="row-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>}
     </div>
   );
 }
 
-function AffairRow({ item, onInspect, onPrepare, onQuick, onRetry, retryingId, feedback }: {
+function AffairRow({ item, onInspect, onPrepare, onQuick, onAskAi, onRetry, retryingId, feedback }: {
   item: TimelineItem;
   onInspect: InspectHandler;
   onPrepare: (preset: ActionPreset) => void;
   onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
+  onAskAi?: (draft: string) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
   feedback?: AffairFeedback;
@@ -3633,16 +3675,17 @@ function AffairRow({ item, onInspect, onPrepare, onQuick, onRetry, retryingId, f
         <Status value={item.status} />
         {feedback && <InlineResult ok={feedback.ok} text={feedback.text} />}
       </div>
-      {!finished && <div className="affair-row-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>}
+      {!finished && <div className="affair-row-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>}
     </div>
   );
 }
 
-function QuickPendingItem({ item, onInspect, onPrepare, onQuick, onRetry, onRetryPrev, retryingId, feedback }: {
+function QuickPendingItem({ item, onInspect, onPrepare, onQuick, onAskAi, onRetry, onRetryPrev, retryingId, feedback }: {
   item: TimelineItem;
   onInspect: InspectHandler;
   onPrepare: (preset: ActionPreset) => void;
   onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
+  onAskAi?: (draft: string) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
   onRetryPrev?: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
@@ -3668,15 +3711,16 @@ function QuickPendingItem({ item, onInspect, onPrepare, onQuick, onRetry, onRetr
       {feedback?.undo && onRetryPrev ? <button type="button" className="row-action-button" disabled={Boolean(retryingId)} onClick={() => void onRetryPrev(item)}>撤销推进</button> : null}
     </div>
     <div className="quick-pending-actions"><Status value={item.status} /></div>
-    <div className="quick-pending-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>
+    <div className="quick-pending-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>
   </div>;
 }
 
-function CompactItem({ item, onInspect, onPrepare, onQuick, onRetry, retryingId, feedback }: {
+function CompactItem({ item, onInspect, onPrepare, onQuick, onAskAi, onRetry, retryingId, feedback }: {
   item: TimelineItem;
   onInspect: InspectHandler;
   onPrepare: (preset: ActionPreset) => void;
   onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
+  onAskAi?: (draft: string) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
   feedback?: AffairFeedback;
@@ -3702,7 +3746,7 @@ function CompactItem({ item, onInspect, onPrepare, onQuick, onRetry, retryingId,
         {feedback && <InlineResult ok={feedback.ok} text={feedback.text} />}
       </div>
       <Status value={item.status} />
-      {!finished && <div className="compact-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>}
+      {!finished && <div className="compact-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>}
     </div>
   );
 }
