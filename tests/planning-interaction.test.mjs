@@ -30,11 +30,12 @@ test('landed cards switch to formal-course actions without an empty layer', () =
 test('overview and affair cards share contextual two-action mappings', () => {
   assert.match(panel, /function ItemActionButtons/);
   assert.match(panel, /item\.domain === 'course'/);
-  assert.match(panel, />调整时间<\/button>/);
+  // 交互铁律：决策类一键（本次不上/完成/没约上），需要输入的走表单（调整时间），取消走详情
+  assert.match(panel, /onQuick\('courseCancel', item\)/);
+  assert.match(panel, /onQuick\?\.\('affairComplete', item\)/);
   assert.match(panel, />本次不上<\/button>/);
-  assert.match(panel, />完成<\/button>/);
   assert.match(panel, /'没约上'/);
-  assert.match(panel, />取消<\/button>/);
+  assert.match(panel, /调整时间…<\/button>/);
   assert.match(panel, /week-card-inline-action/);
   assert.match(panel, /affair-row-inline-action/);
   assert.match(panel, /quick-pending-inline-action/);
@@ -63,10 +64,15 @@ test('overview and planning share one semantic color system', () => {
   assert.match(css, /--wb-kind-temporary: #668ca8/);
   assert.match(panel, /function itemStateClass/);
   assert.match(panel, /function isTemporaryItem/);
-  assert.match(panel, /已确认／已完成/);
+  assert.match(panel, /已确认/);
   assert.match(panel, /待确认／待处理/);
+  assert.match(panel, /已完成·留痕/);
+  assert.match(panel, /function courseOverdue/);
+  assert.match(panel, /过期未标记的课程以琥珀/);
   assert.match(panel, /错误／硬阻塞/);
-  assert.match(panel, /蓝色只标记临时来源/);
+  assert.match(css, /--wb-state-finished: #6e8290/);
+  assert.match(css, /week-time-block\.state-finished/);
+  assert.match(css, /calendar-legend \.finished i/);
 });
 
 test('temporary identity remains independent from confirmed pending and error states', () => {
@@ -124,8 +130,11 @@ test('reservation actions update locally and refresh all data without blocking t
 test('affair records separate scheduled work from completed history', () => {
   assert.match(panel, /const scheduledAffairs = affairs/);
   assert.match(panel, /const closedAffairs = affairs/);
-  assert.match(panel, /title="已安排" meta=\{`\$\{scheduledAffairs\.length\} 项`\}/);
-  assert.match(panel, /title="已完成／已取消" meta=\{`\$\{closedAffairs\.length\} 项`\}/);
-  assert.ok(panel.indexOf('title="已安排"') < panel.indexOf('title="已完成／已取消"'));
+  // 三状态按键（待处理/已安排/已完成·已取消）+ 列表/日历双视图
+  assert.match(panel, /\{ id: 'pending', label: '待处理', count: pending\.length \}/);
+  assert.match(panel, /\{ id: 'scheduled', label: '已安排', count: scheduledAffairs\.length \}/);
+  assert.match(panel, /\{ id: 'closed', label: '已完成·已取消', count: closedAffairs\.length \}/);
+  assert.match(panel, /MonthCalendar items=\{affairs\}/);
+  assert.match(panel, /onOpenDay=\{handleDayOpen\}/);
   assert.match(css, /affair-record-group\.completed \.compact-item/);
 });

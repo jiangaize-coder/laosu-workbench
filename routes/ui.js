@@ -1,6 +1,7 @@
 import fs from "node:fs";
-import { commitPreview, createPreview, getCalendarHealth, getCockpitData, getDashboard, getPlanningData, getPreview, getRuntimeVersions, previewTemplateWeek, summarizeResult } from "../lib/backend.js";
+import { backfillAffairEnds, commitPreview, createPreview, dataRevision, getAffairsMonth, getAffairsMissingEnd, getCalendarHealth, getCockpitData, getDashboard, getPlanningData, getPreview, getRuntimeVersions, getSuggestions, previewTemplateWeek, runSchedule, summarizeResult } from "../lib/backend.js";
 import { getPluginRequestContext, parseModelJson, sampleText } from "../lib/hana-model.js";
+import { OPERATION_IDS, buildAiOperationLines } from "../lib/operations.js";
 import { createSnapshotCache } from "../lib/snapshot-cache.js";
 
 const PLUGIN_VERSION = JSON.parse(fs.readFileSync(new URL("../manifest.json", import.meta.url), "utf8")).version;
@@ -31,7 +32,9 @@ export default function registerPluginUiRoutes(app, ctx) {
 
   app.get("/api/planning", async (c) => {
     try {
-      return c.json(await withSnapshot("planning", () => getPlanningData()));
+      const fresh = c.req.query("fresh") === "1";
+      if (fresh) invalidateAllSnapshots();
+      return c.json(await withSnapshot("planning", () => getPlanningData(), { fresh }));
     } catch (error) {
       ctx.log.error("planning dashboard failed", error);
       return c.json({ ok: false, error: error.message }, 500);
@@ -53,6 +56,55 @@ export default function registerPluginUiRoutes(app, ctx) {
       return c.json(await getRuntimeVersions());
     } catch (error) {
       ctx.log.error("versions failed", error);
+      return c.json({ ok: false, error: error.message }, 500);
+    }
+  });
+
+  app.get("/api/suggestions", async (c) => {
+    try {
+      const fresh = c.req.query("fresh") === "1";
+      return c.json(await withSnapshot("suggestions", () => getSuggestions(), { fresh }));
+    } catch (error) {
+      ctx.log.error("suggestions failed", error);
+      return c.json({ ok: false, error: error.message }, 500);
+    }
+  });
+
+  app.get("/api/affairs-month", async (c) => {
+    try {
+      const fresh = c.req.query("fresh") === "1";
+      return c.json(await withSnapshot("affairs-month", () => getAffairsMonth(), { fresh }));
+    } catch (error) {
+      ctx.log.error("affairs month failed", error);
+      return c.json({ ok: false, error: error.message }, 500);
+    }
+  });
+
+  app.get("/api/affairs/missing-end", async (c) => {
+    try {
+      return c.json(await withSnapshot("affairs-missing-end", () => getAffairsMissingEnd()));
+    } catch (error) {
+      return c.json({ ok: false, error: error.message }, 500);
+    }
+  });
+
+  app.post("/api/affairs/backfill-end", async (c) => {
+    try {
+      const body = await c.req.json();
+      const ids = Array.isArray(body.ids) ? body.ids.filter((id) => typeof id === "string" && /^aff_[a-zA-Z0-9]+$/.test(id)) : [];
+      if (!ids.length) return c.json({ ok: false, error: "没有可补齐的事务" }, 400);
+      const result = await backfillAffairEnds(ids);
+      invalidateAllSnapshots();
+      return c.json({ ...result, message: `已为 ${result.done} 个事务补齐结束时间（默认 60 分钟）` });
+    } catch (error) {
+      return c.json({ ok: false, error: error.message }, 400);
+    }
+  });
+
+  app.get("/api/data-revision", async (c) => {
+    try {
+      return c.json(await dataRevision());
+    } catch (error) {
       return c.json({ ok: false, error: error.message }, 500);
     }
   });
@@ -98,15 +150,38 @@ export default function registerPluginUiRoutes(app, ctx) {
       }, { timeout: 90_000 });
       const plan = parseModelJson(typeof sampled === "string" ? sampled : sampled?.text);
       if (plan.status === "need_clarification") {
-        return c.json({ ok: true, status: "need_clarification", reply: String(plan.reply || "还缺少一些排课信息。") });
+        const options = Array.isArray(plan.options)
+          ? plan.options.filter((item) => typeof item === "string" && item.trim()).map((item) => item.trim().slice(0, 24)).slice(0, 4)
+          : [];
+        return c.json({ ok: true, status: "need_clarification", reply: String(plan.reply || "还缺少一些排课信息。"), options });
       }
-      const allowed = new Set([
-        "course_add", "course_move", "course_cancel", "course_plan", "course_day_complete",
-        "reservation_add", "reservation_update", "reservation_confirm", "reservation_cancel",
-        "zone_set", "availability_set", "availability_clear", "commute_set", "quarantine_overdue", "course_review_resolve",
-        "affair_create", "affair_complete", "affair_retry_next", "affair_cancel", "calendar_sync",
-      ]);
-      if (plan.status !== "ready" || !allowed.has(plan.operation) || !plan.input || typeof plan.input !== "object") {
+      const allowed = new Set(OPERATION_IDS);
+      const batchOperations = Array.isArray(plan.operations) ? plan.operations : null;
+      if (plan.status === "ready" && batchOperations) {
+        if (batchOperations.length < 2 || batchOperations.length > 8) throw new Error("批量方案需要 2–8 条操作");
+        const previews = [];
+        for (const entry of batchOperations) {
+          const operation = entry?.operation;
+          const input = entry?.input;
+          if (!allowed.has(operation) || !input || typeof input !== "object") throw new Error("批量方案里有不可执行的操作");
+          const record = await createPreview(ctx.dataDir, { ...input, operation });
+          previews.push({
+            operation,
+            token: record.token,
+            summary: record.summary,
+            canCommit: record.canCommit,
+            message: summarizeResult(record.preview),
+          });
+        }
+        return c.json({
+          ok: true,
+          status: "ready",
+          batch: true,
+          reply: String(plan.reply || `${previews.length} 项操作已预演`),
+          previews,
+        });
+      }
+            if (plan.status !== "ready" || !allowed.has(plan.operation) || !plan.input || typeof plan.input !== "object") {
         throw new Error("AI 没有生成可执行的操作方案");
       }
       const record = await createPreview(ctx.dataDir, { ...plan.input, operation: plan.operation });
@@ -151,7 +226,7 @@ export default function registerPluginUiRoutes(app, ctx) {
         }, 409);
       }
       const result = await commitPreview(ctx.dataDir, record.token);
-      if (result.ok) invalidateAllSnapshots();
+      if (result.ok || result.primaryCommitted) invalidateAllSnapshots();
       const change = result.primary?.data?.data || {};
       const updated = change.record || result.primary?.data?.readback?.records?.[0] || null;
       const previousDate = change.previous_candidate_date || null;
@@ -182,6 +257,47 @@ export default function registerPluginUiRoutes(app, ctx) {
     }
   });
 
+  app.post("/api/affairs/retry-prev", async (c) => {
+    try {
+      const body = await c.req.json();
+      const id = typeof body.id === "string" ? body.id.trim() : "";
+      if (!id) return c.json({ ok: false, error: "事务 ID 不能为空" }, 400);
+      const input = { operation: "affair_retry_prev", id, expectedVersion: body.expectedVersion };
+      const record = await createPreview(ctx.dataDir, input);
+      if (!record.canCommit) {
+        return c.json({
+          ok: false,
+          error: summarizeResult(record.preview) || "恢复上一候选日的预演未通过",
+          summary: record.summary,
+          preview: record.preview,
+        }, 409);
+      }
+      const result = await commitPreview(ctx.dataDir, record.token);
+      if (result.ok || result.primaryCommitted) invalidateAllSnapshots();
+      const change = result.primary?.data?.data || {};
+      const updated = change.record || result.primary?.data?.readback?.records?.[0] || null;
+      const restoredDate = updated?.retry?.current_candidate_date || updated?.window_start || null;
+      const message = result.ok
+        ? `已恢复到上一候选日${restoredDate ? ` ${restoredDate}` : ""}`
+        : summarizeResult(result.primary);
+      return c.json({
+        ...result,
+        message,
+        detail: summarizeResult(result.primary),
+        outcome: updated ? {
+          id: updated.id,
+          title: updated.title,
+          status: updated.status,
+          version: updated.version,
+          candidateDate: restoredDate,
+        } : null,
+      }, result.ok ? 200 : 409);
+    } catch (error) {
+      ctx.log.warn("affair retry-prev rejected", error.message);
+      return c.json({ ok: false, error: error.message }, 400);
+    }
+  });
+
   app.post("/api/reservations/confirm", async (c) => {
     try {
       const body = await c.req.json();
@@ -192,7 +308,7 @@ export default function registerPluginUiRoutes(app, ctx) {
         return c.json({ ok: false, error: summarizeResult(record.preview) || "预留确认预演未通过", preview: record.preview }, 409);
       }
       const result = await commitPreview(ctx.dataDir, record.token);
-      if (result.ok) invalidateAllSnapshots();
+      if (result.ok || result.primaryCommitted) invalidateAllSnapshots();
       const syncNote = result.sync?.queued
         ? "，飞书日历正在后台同步"
         : result.sync && !result.sync.ok
@@ -202,6 +318,94 @@ export default function registerPluginUiRoutes(app, ctx) {
       return c.json({ ...result, message, detail: summarizeResult(result.primary), syncMessage: result.sync ? summarizeResult(result.sync) : null }, result.ok ? 200 : 409);
     } catch (error) {
       ctx.log.warn("reservation confirm quick action rejected", error.message);
+      return c.json({ ok: false, error: error.message }, 400);
+    }
+  });
+
+  // 日历同步一键：预演+提交内部完成。
+  app.post("/api/calendar/sync-quick", async (c) => {
+    try {
+      const record = await createPreview(ctx.dataDir, { operation: "calendar_sync" });
+      if (!record.canCommit) return c.json({ ok: false, error: summarizeResult(record.preview) || "同步预演未通过" }, 409);
+      const result = await commitPreview(ctx.dataDir, record.token);
+      if (result.ok || result.primaryCommitted) invalidateAllSnapshots();
+      const message = result.ok ? "日历已同步" : summarizeResult(result.primary);
+      return c.json({ ...result, message }, result.ok ? 200 : 409);
+    } catch (error) {
+      ctx.log.warn("calendar sync-quick rejected", error.message);
+      return c.json({ ok: false, error: error.message }, 400);
+    }
+  });
+
+  // 批量转复核一键。
+  app.post("/api/courses/quarantine-quick", async (c) => {
+    try {
+      const result = await runSchedule(["quarantine-overdue", "--commit"]);
+      if (!result.ok) return c.json({ ok: false, error: summarizeResult(result) }, 409);
+      invalidateAllSnapshots();
+      return c.json({ ok: true, message: summarizeResult(result) });
+    } catch (error) {
+      ctx.log.warn("quarantine-quick rejected", error.message);
+      return c.json({ ok: false, error: error.message }, 400);
+    }
+  });
+
+  // 过期课"已上"：转复核＋确认完成合并执行（老苏即人工，一步到位）。
+  app.post("/api/courses/overdue-complete", async (c) => {
+    try {
+      const body = await c.req.json();
+      const student = typeof body.student === "string" ? body.student.trim() : "";
+      const date = typeof body.date === "string" ? body.date.trim() : "";
+      if (!student || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return c.json({ ok: false, error: "学生或日期无效" }, 400);
+      const quarantine = await runSchedule(["quarantine-overdue", "--commit"]);
+      if (!quarantine.ok) return c.json({ ok: false, error: "过期课转入复核失败：" + summarizeResult(quarantine) }, 409);
+      const list = await runSchedule(["review", "list"]);
+      const match = (list.data?.data?.courses ?? []).find((item) => (item.student === student || item.student_name === student) && item.date === date && item.status === "待确认");
+      if (!match) return c.json({ ok: false, error: `没有找到 ${student} ${date} 的待确认课程（可能已被处理，请刷新）` }, 409);
+      const record = await createPreview(ctx.dataDir, { operation: "course_review_resolve", courseId: match.course_id, resolution: "done" });
+      if (!record.canCommit) return c.json({ ok: false, error: summarizeResult(record.preview) || "复核预演未通过" }, 409);
+      const result = await commitPreview(ctx.dataDir, record.token);
+      if (result.ok || result.primaryCommitted) invalidateAllSnapshots();
+      return c.json({ ...result, message: result.ok ? `已确认 ${student} ${date} 已完成` : summarizeResult(result.primary) }, result.ok ? 200 : 409);
+    } catch (error) {
+      ctx.log.warn("overdue complete rejected", error.message);
+      return c.json({ ok: false, error: error.message }, 400);
+    }
+  });
+
+  // 事务"完成"一键：预演＋提交内部完成，前台只点一下。
+  app.post("/api/affairs/complete", async (c) => {
+    try {
+      const body = await c.req.json();
+      const id = typeof body.id === "string" ? body.id.trim() : "";
+      if (!/^aff_[a-zA-Z0-9]+$/.test(id)) return c.json({ ok: false, error: "事务 ID 格式无效" }, 400);
+      const input = { operation: "affair_complete", id, expectedVersion: body.expectedVersion };
+      const record = await createPreview(ctx.dataDir, input);
+      if (!record.canCommit) return c.json({ ok: false, error: summarizeResult(record.preview) || "完成预演未通过" }, 409);
+      const result = await commitPreview(ctx.dataDir, record.token);
+      if (result.ok || result.primaryCommitted) invalidateAllSnapshots();
+      const message = result.ok ? "已完成" : summarizeResult(result.primary);
+      return c.json({ ...result, message }, result.ok ? 200 : 409);
+    } catch (error) {
+      ctx.log.warn("affair complete rejected", error.message);
+      return c.json({ ok: false, error: error.message }, 400);
+    }
+  });
+
+  // 预留"取消"一键。
+  app.post("/api/reservations/cancel-quick", async (c) => {
+    try {
+      const body = await c.req.json();
+      const reservationId = typeof body.reservationId === "string" ? body.reservationId.trim() : "";
+      if (!reservationId) return c.json({ ok: false, error: "预留 ID 不能为空" }, 400);
+      const record = await createPreview(ctx.dataDir, { operation: "reservation_cancel", reservationId });
+      if (!record.canCommit) return c.json({ ok: false, error: summarizeResult(record.preview) || "取消预演未通过" }, 409);
+      const result = await commitPreview(ctx.dataDir, record.token);
+      if (result.ok || result.primaryCommitted) invalidateAllSnapshots();
+      const message = result.ok ? "已取消预留" : summarizeResult(result.primary);
+      return c.json({ ...result, message }, result.ok ? 200 : 409);
+    } catch (error) {
+      ctx.log.warn("reservation cancel-quick rejected", error.message);
       return c.json({ ok: false, error: error.message }, 400);
     }
   });
@@ -221,7 +425,7 @@ export default function registerPluginUiRoutes(app, ctx) {
         return c.json({ ok: false, error: summarizeResult(record.preview) || "课程没上的预演未通过", preview: record.preview }, 409);
       }
       const result = await commitPreview(ctx.dataDir, record.token);
-      if (result.ok) invalidateAllSnapshots();
+      if (result.ok || result.primaryCommitted) invalidateAllSnapshots();
       const message = result.ok
         ? `已记录 ${input.student} ${input.date} ${input.time} 没上，并同步课表与日历`
         : summarizeResult(result.primary);
@@ -242,7 +446,7 @@ export default function registerPluginUiRoutes(app, ctx) {
       }
       const count = record.preview?.data?.data?.count || 0;
       const result = await commitPreview(ctx.dataDir, record.token);
-      if (result.ok) invalidateAllSnapshots();
+      if (result.ok || result.primaryCommitted) invalidateAllSnapshots();
       const message = result.ok
         ? `已记录 ${input.date} 全部上完，共完成 ${count} 节，并同步课表与日历`
         : summarizeResult(result.primary);
@@ -295,7 +499,7 @@ export default function registerPluginUiRoutes(app, ctx) {
     try {
       const body = await c.req.json();
       const result = await commitPreview(ctx.dataDir, String(body.token || ""));
-      if (result.ok) invalidateAllSnapshots();
+      if (result.ok || result.primaryCommitted) invalidateAllSnapshots();
       return c.json({
         ...result,
         message: summarizeResult(result.primary),
@@ -356,7 +560,7 @@ async function buildAiSchedulingContext() {
 }
 
 function buildAiSchedulingPrompt() {
-  return `你是“课务台”的严格操作编译器。把用户自然语言转成一个可预演的结构化操作；你不直接写数据库，也不能编造学生、日期、课程、预留、事务或通勤信息。\n\n只输出一个 JSON 对象，不要 Markdown：\n信息不足时：{"status":"need_clarification","reply":"只追问一个最关键问题"}\n可以执行时：{"status":"ready","reply":"用一句中文概括方案","operation":"操作名","input":{...}}\n\n允许的操作与 input：\n1. course_add: {student,date,time,duration,note?,overrideAvailability?}\n2. course_move: {student,fromDate,fromTime,toDate,toTime,duration?,overrideAvailability?}\n3. course_cancel: {student,date,time,reason?}\n4. course_plan: {title?,moves:[{student,fromDate,fromTime,toDate,toTime,duration?}, ...]}，仅用于两项及以上调课\n5. course_day_complete: {date}\n6. reservation_add: {student,date,time,duration?,zone?,note?}\n7. reservation_update: {reservationId,date,time,duration?,zone?,note?}\n8. reservation_confirm: {reservationId}\n9. reservation_cancel: {reservationId}\n10. zone_set: {student,zone,boundaryZones?}\n11. availability_set: {student,weekday,windows:"HH:MM-HH:MM、HH:MM-HH:MM"}\n12. availability_clear: {student,weekday}\n13. commute_set: {fromStudent,toStudent,minutes,transport?,note?}\n14. quarantine_overdue: {}\n15. course_review_resolve: {courseId,resolution:"done"|"cancelled"}\n16. affair_create: {affairKind,title,startDate?,startTime?,duration?,deadlineDate?,deadlineTime?,windowStart?,windowEnd?,candidateDates?,weekdays?,startWeek?,remindAt?,priority?}\n17. affair_complete / affair_retry_next / affair_cancel: {id,expectedVersion?}\n18. calendar_sync: {week?}\n\n硬规则：\n- 调课只能 course_move/course_plan，禁止 cancel+add；明确取消某一节课才用 course_cancel。\n- “先留着、暂定、可能、预期、还没确认”必须用 reservation_add；明确确认上课才用 course_add。\n- 操作已有预留、事务或待复核课程时，只能使用 context 中真实存在的 ID；找不到就追问，不能编造。\n- “今天课程已上完”用 course_day_complete；不能自动把单节历史待确认课程判断为完成。\n- 用户给时间窗口时，在现有可用时间与课程空档中选择一个具体开始时间；无法可靠选择就追问。\n- 日期输出 YYYY-MM-DD，时间输出 HH:MM；“今天/明天”以 context.logicalDate 和 04:00 日界线为准，周几选择不早于 logicalDate 的最近日期。\n- 默认时长用学生 defaultDuration；不要擅自使用 force。\n- availability 是长期候选时间。只有用户明确说明某个具体日期和时间已经确定、或明确要求作为单次例外时，course_add/course_move 才可设置 overrideAvailability:true；它不修改长期资料。\n- reservation_confirm 已经代表具体时间被确认，不需要额外设置 overrideAvailability。\n- 任何冲突最终由底层 dry-run 判断；出游、重复课程和老师冲突继续作为硬保护。\n- 通勤只在排具体时间时询问，不作为落课硬锁；若 dry-run 返回 questions，必须如实提示用户确认。\n- 当前排课上下文会随用户消息一起提供；只能依据它做选择。\n- reply 必须使用“拟安排/建议/还需确认”，禁止说“已安排/已预留/已完成”，因为当前只生成预演。`;
+  return `你是“课务台”的严格操作编译器。把用户自然语言转成一个可预演的结构化操作；你不直接写数据库，也不能编造学生、日期、课程、预留、事务或通勤信息。\n\n只输出一个 JSON 对象，不要 Markdown：\n信息不足时：{"status":"need_clarification","reply":"只追问一个最关键问题","options":["候选答案1","候选答案2","候选答案3"]}\n单个操作可执行时：{"status":"ready","reply":"用一句中文概括方案","operation":"操作名","input":{...}}\n多个相关变更（用户明确一句话要改多处，2–8 条）：{"status":"ready","reply":"概括整批方案","operations":[{"operation":"操作名","input":{...}}, ...]}\n\n允许的操作与 input：\n${buildAiOperationLines()}\n\n硬规则：\n- 调课只能 course_move/course_plan，禁止 cancel+add；明确取消某一节课才用 course_cancel。\n- 用户要改事务的时间、标题、优先级或备注时用 affair_update，禁止用取消+新建代替；retry 事务的候选日只能用 affair_retry_next/affair_retry_prev 推进或恢复，不能直接改时间。\n- “先留着、暂定、可能、预期、还没确认”必须用 reservation_add；明确确认上课才用 course_add。\n- 操作已有预留、事务或待复核课程时，只能使用 context 中真实存在的 ID；找不到就追问，不能编造。\n- “今天课程已上完”用 course_day_complete；不能自动把单节历史待确认课程判断为完成。\n- 用户给时间窗口时，在现有可用时间与课程空档中选择一个具体开始时间；无法可靠选择就追问。\n- 日期输出 YYYY-MM-DD，时间输出 HH:MM；“今天/明天”以 context.logicalDate 和 04:00 日界线为准，周几选择不早于 logicalDate 的最近日期。\n- 默认时长用学生 defaultDuration；不要擅自使用 force。\n- availability 是长期候选时间。只有用户明确说明某个具体日期和时间已经确定、或明确要求作为单次例外时，course_add/course_move 才可设置 overrideAvailability:true；它不修改长期资料。\n- reservation_confirm 已经代表具体时间被确认，不需要额外设置 overrideAvailability。\n- 任何冲突最终由底层 dry-run 判断；出游、重复课程和老师冲突继续作为硬保护。\n- 通勤只在排具体时间时询问，不作为落课硬锁；若 dry-run 返回 questions，必须如实提示用户确认。\n- 当前排课上下文会随用户消息一起提供；只能依据它做选择。\n- 追问必须带 options：2–4 个候选答案、每个不超过 12 个字，让用户点选而不是打字。\n- operations 仅当用户一句话确实包含多个变更时使用；每条分别满足各自的规则；拿不准就拆成多次或追问。\n- reply 必须使用“拟安排/建议/还需确认”，禁止说“已安排/已预留/已完成”，因为当前只生成预演。`;
 }
 
 function renderShell(c, ctx, surface) {
@@ -380,13 +584,22 @@ function renderShell(c, ctx, surface) {
 <body data-hana-theme="${escapeAttr(theme)}" data-surface="${surface}">
   <div id="root" data-surface="${surface}"></div>
   <script>
-    window.addEventListener('error', function (event) {
+    // 启动失败提示只能用 textContent 写入：错误消息可能携带接口返回文本，禁止拼 HTML。
+    function showBootFailure(text) {
       var root = document.getElementById('root');
-      if (root && !root.innerHTML) root.innerHTML = '<pre style="padding:20px;white-space:pre-wrap;color:#a75649">页面脚本错误：' + String(event.message || '未知错误') + '</pre>';
+      if (!root || root.childNodes.length) return;
+      var pre = document.createElement('pre');
+      pre.style.padding = '20px';
+      pre.style.whiteSpace = 'pre-wrap';
+      pre.style.color = '#a75649';
+      pre.textContent = text;
+      root.appendChild(pre);
+    }
+    window.addEventListener('error', function (event) {
+      showBootFailure('页面脚本错误：' + String(event.message || '未知错误'));
     });
     window.addEventListener('unhandledrejection', function (event) {
-      var root = document.getElementById('root');
-      if (root && !root.innerHTML) root.innerHTML = '<pre style="padding:20px;white-space:pre-wrap;color:#a75649">页面加载失败：' + String(event.reason || '未知错误') + '</pre>';
+      showBootFailure('页面加载失败：' + String(event.reason || '未知错误'));
     });
   </script>
   <script type="module" src="${escapeAttr(panelJs)}"></script>

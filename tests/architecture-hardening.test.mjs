@@ -72,6 +72,27 @@ test('快照失效后旧 in-flight 结果不会写回', async () => {
   assert.equal(freshCalls, 1);
 });
 
+test('并发取数完成顺序颠倒时旧结果不会回写缓存', async () => {
+  const cache = createSnapshotCache(30_000);
+  let releaseOld;
+  const old = cache.get('dashboard', async () => {
+    await new Promise((resolve) => { releaseOld = resolve; });
+    return 'old';
+  });
+  const fresh = cache.get('dashboard', async () => 'new', { fresh: true });
+  await Promise.resolve();
+  releaseOld();
+  assert.equal(await old, 'old');
+  assert.equal(await fresh, 'new');
+  let thirdCalls = 0;
+  const third = await cache.get('dashboard', async () => {
+    thirdCalls += 1;
+    return 'third';
+  });
+  assert.equal(third, 'new');
+  assert.equal(thirdCalls, 0);
+});
+
 test('同步队列首次失败时仍消费运行中追加的请求', async () => {
   let calls = 0;
   let release;

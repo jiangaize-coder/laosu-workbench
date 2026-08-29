@@ -1,4 +1,5 @@
 import { createPreview, summarizeResult } from "../lib/backend.js";
+import { OPERATION_IDS } from "../lib/operations.js";
 
 export const name = "preview_change";
 export const description = "预演课程、预留、学生片区、可用时间、通勤、复核、事务或日历同步变更；只生成预览，不提交真实变更。";
@@ -7,7 +8,7 @@ export const parameters = {
   properties: {
     operation: {
       type: "string",
-      enum: ["course_move", "course_add", "course_cancel", "course_day_complete", "course_plan", "reservation_add", "reservation_update", "reservation_confirm", "reservation_cancel", "zone_set", "availability_set", "availability_clear", "commute_set", "quarantine_overdue", "course_review_resolve", "affair_create", "affair_complete", "affair_retry_next", "affair_cancel", "calendar_sync"],
+      enum: OPERATION_IDS,
     },
     student: { type: "string" },
     fromDate: { type: "string" },
@@ -39,6 +40,9 @@ export const parameters = {
     deadlineTime: { type: "string" },
     windowStart: { type: "string" },
     windowEnd: { type: "string" },
+    endDate: { type: "string" },
+    endTime: { type: "string" },
+    followUp: { type: "string", description: "办成前每日跟进：daily 开启，none 关闭" },
     candidateDates: { type: "string" },
     weekdays: { type: "string" },
     startWeek: { type: "string" },

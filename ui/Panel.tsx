@@ -1,20 +1,5 @@
 import { Component, FormEvent, PointerEvent as ReactPointerEvent, type ErrorInfo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-function useCloseOnOutside<T extends HTMLElement>(open: boolean, onClose: () => void) {
-  const ref = useRef<T | null>(null);
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
-  useEffect(() => {
-    if (!open) return;
-    const handler = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (ref.current && target && !ref.current.contains(target)) closeRef.current();
-    };
-    document.addEventListener('pointerdown', handler);
-    return () => document.removeEventListener('pointerdown', handler);
-  }, [open]);
-  return ref;
-}
 
 import { hana } from '@hana/plugin-sdk';
 import { HanaThemeProvider } from '@hana/plugin-components';
@@ -24,7 +9,30 @@ import { addDateDays, buildMonthGridDates, buildWeekDates, buildWeekPageSlots, c
 import { api } from './api-client';
 import { createRequestGate } from './request-gate';
 
-type Tab = 'overview' | 'cockpit' | 'planning' | 'affairs';
+type Tab = 'overview' | 'planning' | 'affairs';
+type PlanningSection = 'calendar' | 'trial' | 'students' | 'candidates';
+type SuggestionCard = {
+  id: string;
+  tone: 'urgent' | 'warn' | 'info';
+  title: string;
+  detail: string;
+  action: {
+    kind: 'preview' | 'openDay' | 'navigate' | 'retryNext' | 'overdue' | 'backfill';
+    label: string;
+    operation?: string;
+    input?: Record<string, unknown>;
+    date?: string;
+    tab?: string;
+    section?: string;
+    id?: string;
+    version?: number;
+    title?: string;
+    student?: string;
+    time?: string;
+    cancelLabel?: string;
+    ids?: string[];
+  };
+};
 type Scope = 'today' | 'week' | 'month' | 'horizon';
 
 type TimelineItem = {
@@ -231,6 +239,8 @@ type PreviewResponse = {
   operation?: string;
   input?: Record<string, unknown>;
   committed?: boolean;
+  batch?: boolean;
+  batchItems?: Array<{ operation: string; token: string; summary: string; canCommit: boolean; message?: string; resultOk?: boolean }>;
 };
 
 type AiMessage = { role: 'user' | 'assistant'; text: string };
@@ -239,6 +249,9 @@ type AiInterpretResponse = {
   ok: boolean;
   status?: 'ready' | 'need_clarification';
   reply?: string;
+  options?: string[];
+  batch?: boolean;
+  previews?: Array<{ operation: string; token: string; summary: string; canCommit: boolean; message: string }>;
   operation?: string;
   input?: Record<string, unknown>;
   preview?: {
@@ -256,12 +269,13 @@ type AffairFeedback = {
   ok: boolean;
   text: string;
   buttonLabel?: string;
+  undo?: { expectedVersion?: number };
 };
 
 type FocusTarget = { tab: Tab; id: string };
 type ContextView =
   | { kind: 'item'; item: TimelineItem }
-  | { kind: 'day'; date: string }
+  | { kind: 'day'; date: string; items?: TimelineItem[] }
   | { kind: 'system' };
 type InspectHandler = (item: TimelineItem, trigger?: HTMLElement | null) => void;
 type OpenDayHandler = (date: string, trigger?: HTMLElement | null) => void;
@@ -282,7 +296,6 @@ type ActionPreset = {
 
 const tabs: Array<{ id: Tab; label: string }> = [
   { id: 'overview', label: '总览' },
-  { id: 'cockpit', label: '驾驶舱' },
   { id: 'planning', label: '筹备' },
   { id: 'affairs', label: '事务' },
 ];
@@ -397,16 +410,23 @@ function itemDate(item: TimelineItem) {
 }
 
 function statusTone(status: string) {
-  if (['completed', '已完成'].includes(status)) return 'done';
+  if (['completed', '已完成'].includes(status)) return 'finished';
   if (['cancelled', '已取消', '已调课'].includes(status)) return 'muted';
   if (['failed', 'error', 'blocked', '异常', '失败'].includes(status)) return 'error';
   if (['pending_confirmation', '待确认', 'needs_reschedule'].includes(status)) return 'warn';
   return 'active';
 }
 
-function itemStateClass(item: TimelineItem) {
+function courseOverdue(item: TimelineItem, today?: string) {
+  if (!today || item.domain !== 'course') return false;
+  const date = (item.start_at || '').slice(0, 10);
+  return Boolean(date) && date < today && item.status === '待上课';
+}
+
+function itemStateClass(item: TimelineItem, today?: string) {
+  if (courseOverdue(item, today)) return 'state-pending';
   const tone = statusTone(item.status);
-  if (tone === 'done') return 'state-confirmed';
+  if (tone === 'finished') return 'state-finished';
   if (tone === 'muted') return 'state-neutral';
   if (tone === 'error') return 'state-error';
   if (tone === 'warn') return 'state-pending';
@@ -415,6 +435,24 @@ function itemStateClass(item: TimelineItem) {
 
 function isTemporaryItem(item: TimelineItem) {
   return item.scope === 'one_off' || ['reservation', 'manual', 'move'].includes(item.origin || '');
+}
+
+// 秒开缓存：上一次数据存 sessionStorage，打开页面先瞬时显示，再后台全量重扫。
+function readWorkbenchCache<T>(key: string): T | null {
+  try {
+    const raw = window.sessionStorage.getItem(`laosu-workbench.cache.${key}`);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeWorkbenchCache(key: string, data: unknown) {
+  try {
+    window.sessionStorage.setItem(`laosu-workbench.cache.${key}`, JSON.stringify(data));
+  } catch {
+    // 缓存失败不影响业务。
+  }
 }
 
 function Panel() {
@@ -444,6 +482,12 @@ function Panel() {
   const [dayCompleteBusy, setDayCompleteBusy] = useState(false);
   const [dayCompleteFeedback, setDayCompleteFeedback] = useState<AffairFeedback | null>(null);
   const [planningRevision, setPlanningRevision] = useState(0);
+  const [planningSectionHint, setPlanningSectionHint] = useState<{ section: PlanningSection; nonce: number } | null>(null);
+
+  function navigateWithSection(tab: Tab, section?: string) {
+    if (section) setPlanningSectionHint({ section: section as PlanningSection, nonce: Date.now() });
+    navigateTo(tab);
+  }
   const [focusTarget, setFocusTarget] = useState<FocusTarget | null>(null);
   const drawerRef = useRef<HTMLElement | null>(null);
   const contextDrawerRef = useRef<HTMLElement | null>(null);
@@ -455,7 +499,6 @@ function Panel() {
   const contextHistoryRef = useRef(false);
   const scrollPositionsRef = useRef<Record<Tab, number>>({
     overview: Number(window.sessionStorage.getItem('laosu-workbench.scroll.overview') || 0),
-    cockpit: Number(window.sessionStorage.getItem('laosu-workbench.scroll.cockpit') || 0),
     planning: Number(window.sessionStorage.getItem('laosu-workbench.scroll.planning') || 0),
     affairs: Number(window.sessionStorage.getItem('laosu-workbench.scroll.affairs') || 0),
   });
@@ -473,6 +516,7 @@ function Panel() {
       const data = assertDashboard(await api<Dashboard>(`api/dashboard?${query.toString()}`));
       if (!dashboardRequestGateRef.current.isCurrent(requestId)) return null;
       setDashboard(data);
+      writeWorkbenchCache(`dashboard.${nextScope}`, data);
       return true;
     } catch (err: any) {
       if (!dashboardRequestGateRef.current.isCurrent(requestId)) return null;
@@ -484,7 +528,13 @@ function Panel() {
   }, [scope]);
 
   useEffect(() => {
-    void loadDashboard(initialScope);
+    // 打开即真相：先瞬时显示上一次内容，再强制全量重扫（外部 AI 改动也能被带回）。
+    const cached = readWorkbenchCache<Dashboard>(`dashboard.${initialScope}`);
+    if (cached) {
+      setDashboard(cached);
+      setLoading(false);
+    }
+    void loadDashboard(initialScope, { fresh: true, silent: Boolean(cached) });
   }, []);
 
   useEffect(() => {
@@ -718,6 +768,29 @@ function Panel() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  // 外部改动自动感知：轮询两个本地库的 mtime 版本号，变化即静默全量重扫。
+  const dataRevisionRef = useRef<number | null>(null);
+  useEffect(() => {
+    const timer = window.setInterval(async () => {
+      if (document.hidden) return;
+      try {
+        const res = await api<{ ok: boolean; revision: number }>('api/data-revision');
+        if (!res?.ok || typeof res.revision !== 'number') return;
+        if (dataRevisionRef.current === null) {
+          dataRevisionRef.current = res.revision;
+          return;
+        }
+        if (res.revision !== dataRevisionRef.current) {
+          dataRevisionRef.current = res.revision;
+          void refreshCurrent({ silent: true });
+        }
+      } catch {
+        // 轮询失败静默忽略。
+      }
+    }, 15_000);
+    return () => window.clearInterval(timer);
+  }, [scope]);
+
   const activePending = useMemo(
     () => (dashboard?.pending ?? []).filter((item) => !['completed', 'cancelled'].includes(item.status)),
     [dashboard],
@@ -735,6 +808,13 @@ function Panel() {
     url.searchParams.set('scope', next);
     window.history.replaceState(window.history.state, '', url);
     setScope(next);
+    const cached = readWorkbenchCache<Dashboard>(`dashboard.${next}`);
+    if (cached) {
+      setDashboard(cached);
+      setLoading(false);
+      void loadDashboard(next, { fresh: true, silent: true });
+      return;
+    }
     await loadDashboard(next);
   }
 
@@ -773,9 +853,9 @@ function Panel() {
     setContextView({ kind: 'item', item });
   }
 
-  function openDayDetail(date: string, trigger?: HTMLElement | null) {
+  function openDayDetail(date: string, trigger?: HTMLElement | null, items?: TimelineItem[]) {
     rememberContextTrigger(trigger);
-    setContextView({ kind: 'day', date });
+    setContextView({ kind: 'day', date, items });
   }
 
   function openSystem(trigger?: HTMLElement | null) {
@@ -846,15 +926,50 @@ function Panel() {
     setContextView(null);
   }
 
+  // 一键决策：预演+提交+回读在后台完成，前台只点一下。
+  async function handleQuick(action: 'courseCancel' | 'affairComplete', item: TimelineItem) {
+    if (quickBusyId) return;
+    setQuickBusyId(item.id);
+    try {
+      const data = action === 'courseCancel'
+        ? await api<any>('api/courses/cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student: item.title, date: item.start_at?.slice(0, 10), time: item.start_at?.slice(11, 16), reason: '没上' }),
+        })
+        : await api<any>('api/affairs/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: item.id, expectedVersion: item.version }),
+        });
+      if (!data.ok) throw new Error(data.error || '处理未完成');
+      if (action === 'affairComplete') {
+        setAffairFeedback((current) => ({ ...current, [item.id]: { ok: true, text: data.message || '已完成', buttonLabel: '已完成' } }));
+        setToast(`${item.title} 已完成`);
+      } else {
+        setToast(`${item.title} ${item.start_at?.slice(5, 16) ?? ''} 已记录没上`);
+      }
+      await loadDashboard(scope);
+    } catch (err: any) {
+      if (action === 'affairComplete') {
+        setAffairFeedback((current) => ({ ...current, [item.id]: { ok: false, text: `处理失败：${err.message || '未知错误'}` } }));
+      }
+      setToast(`处理失败：${err.message || '未知错误'}`);
+    } finally {
+      setQuickBusyId(null);
+    }
+  }
+
   async function refreshCurrent(options: { silent?: boolean } = {}) {
     const silent = options.silent === true;
     if (!silent) setToast('正在刷新数据…');
+    // 一键全量扫描：总览 + 筹备 + 驾驶舱 + AI 上下文（fresh=1 服务端会失效全部快照）。
     const ok = await loadDashboard(scope, { ...options, fresh: !silent });
     if (ok === true) {
       setAffairFeedback({});
       setDayCompleteFeedback(null);
       setPlanningRevision((current) => current + 1);
-      if (!silent) setToast('课表、筹备和事务数据已刷新');
+      if (!silent) setToast('课表、筹备、驾驶舱和事务数据已全部刷新');
     } else if (ok === false && !silent) {
       setToast('刷新失败，请查看页面错误');
     }
@@ -913,11 +1028,43 @@ function Panel() {
       if (!data.ok) throw new Error(data.error || '没约上的处理未完成');
       const candidateDate = data.outcome?.candidateDate as string | undefined;
       const buttonLabel = candidateDate ? `已安排 ${candidateDate.slice(5)}` : '已处理';
-      setAffairFeedback((current) => ({ ...current, [item.id]: { ok: true, text: data.message || '已推进到下一次尝试', buttonLabel } }));
+      setAffairFeedback((current) => ({ ...current, [item.id]: {
+        ok: true,
+        text: data.message || '已推进到下一次尝试',
+        buttonLabel,
+        undo: data.outcome ? { expectedVersion: data.outcome.version } : undefined,
+      } }));
       await loadDashboard(scope);
     } catch (err: any) {
       const message = err.message || '没约上的处理失败';
       setAffairFeedback((current) => ({ ...current, [item.id]: { ok: false, text: `处理失败：${message}`, buttonLabel: '重试' } }));
+    } finally {
+      setQuickBusyId(null);
+    }
+  }
+
+  async function handleAffairRetryPrev(item: TimelineItem) {
+    if (quickBusyId) return;
+    const undo = affairFeedback[item.id]?.undo;
+    setQuickBusyId(item.id);
+    setAffairFeedback((current) => ({ ...current, [item.id]: { ok: true, text: '正在恢复上一候选日…', buttonLabel: '处理中…' } }));
+    try {
+      const data = await api<any>('api/affairs/retry-prev', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, expectedVersion: undo?.expectedVersion ?? item.version }),
+      });
+      if (!data.ok) throw new Error(data.error || '恢复上一候选日未完成');
+      const candidateDate = data.outcome?.candidateDate as string | undefined;
+      setAffairFeedback((current) => ({ ...current, [item.id]: {
+        ok: true,
+        text: data.message || '已恢复到上一候选日',
+        buttonLabel: candidateDate ? `回到 ${candidateDate.slice(5)}` : '已恢复',
+      } }));
+      await loadDashboard(scope);
+    } catch (err: any) {
+      const message = err.message || '恢复上一候选日失败';
+      setAffairFeedback((current) => ({ ...current, [item.id]: { ok: false, text: `恢复失败：${message}`, buttonLabel: '重试' } }));
     } finally {
       setQuickBusyId(null);
     }
@@ -940,6 +1087,53 @@ function Panel() {
       if (previewRequestGateRef.current.isCurrent(requestId)) setPreview(completedPreview);
     } catch (err: any) {
       if (previewRequestGateRef.current.isCurrent(requestId)) setPreview({ ok: false, error: err.message });
+    } finally {
+      endBusyOperation(busyKey);
+    }
+  }
+
+  async function commitBatch() {
+    const items = preview?.batchItems ?? [];
+    if (!items.length) return;
+    const requestId = previewRequestGateRef.current.begin();
+    const busyKey = beginBusyOperation();
+    const results = new Map<string, { ok: boolean; message: string }>();
+    try {
+      for (const item of items) {
+        if (!item.canCommit) {
+          results.set(item.token, { ok: false, message: '预演未通过，已跳过' });
+          continue;
+        }
+        try {
+          const data = await api<any>('api/commit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: item.token }),
+          });
+          results.set(item.token, { ok: Boolean(data.ok), message: data.message || (data.ok ? '已执行' : '执行失败') });
+          if (!data.ok) break;
+        } catch (err: any) {
+          results.set(item.token, { ok: false, message: err.message || '提交失败' });
+          break;
+        }
+      }
+      await loadDashboard(scope);
+      setPlanningRevision((current) => current + 1);
+      if (previewRequestGateRef.current.isCurrent(requestId) && preview) {
+        setPreview({
+          ...preview,
+          ok: items.every((item) => results.get(item.token)?.ok === true),
+          committed: true,
+          message: items.map((item) => {
+            const result = results.get(item.token);
+            return `${result?.ok ? '✓' : result ? '✗' : '·'} ${item.summary}：${result?.message || '未执行'}`;
+          }).join('\n'),
+          batchItems: items.map((item) => {
+            const result = results.get(item.token);
+            return { ...item, canCommit: false, resultOk: result?.ok ?? false, message: result?.message || '未执行' };
+          }),
+        });
+      }
     } finally {
       endBusyOperation(busyKey);
     }
@@ -971,24 +1165,25 @@ function Panel() {
           {error && <Notice tone="error" title="读取失败" text={error} />}
           {dashboard?.warnings?.length ? <Notice tone="warn" title="有警告" text={dashboard.warnings.join('；')} /> : null}
           {loading && !dashboard ? <LoadingState /> : null}
-          {dashboard && tab !== 'planning' && <section className="global-scope-bar" aria-label="时间范围" aria-busy={loading}>
+          {dashboard && tab !== 'planning' && tab !== 'affairs' && <section className="global-scope-bar" aria-label="时间范围" aria-busy={loading}>
             <div className="scope-context">
               <span>{loading ? '正在更新时间' : '时间范围'}</span>
               <strong>{formatRange(dashboard.range)}</strong>
             </div>
-            <div className="scope-switch">
-              {(Object.keys(scopeLabels) as Scope[]).map((item) => (
-                <button type="button" key={item} className={scope === item ? 'selected' : ''} disabled={loading} onClick={() => void changeScope(item)}>{scopeLabels[item]}</button>
-              ))}
-            </div>
+            <WorkbenchNav
+              label="时间范围切换"
+              busy={loading}
+              value={scope}
+              onChange={(next) => void changeScope(next as Scope)}
+              items={(Object.keys(scopeLabels) as Scope[]).map((item) => ({ id: item, label: scopeLabels[item] }))}
+            />
           </section>}
           <div className={loading && dashboard ? 'view-content scope-loading' : 'view-content'} aria-busy={loading && Boolean(dashboard)} inert={loading && Boolean(dashboard)}>
             {dashboard && tab === 'overview' && (
-              <Overview dashboard={dashboard} pending={activePending} upcoming={upcoming} onInspect={openItemDetail} onOpenDay={openDayDetail} onPrepare={openAction} onRetry={handleAffairRetry} retryingId={quickBusyId} affairFeedback={affairFeedback} onDayComplete={handleDayComplete} dayBusy={dayCompleteBusy} dayFeedback={dayCompleteFeedback} />
+              <Overview dashboard={dashboard} pending={activePending} upcoming={upcoming} onInspect={openItemDetail} onOpenDay={openDayDetail} onPrepare={openAction} onRetry={handleAffairRetry} onRetryPrev={handleAffairRetryPrev} retryingId={quickBusyId} affairFeedback={affairFeedback} onDayComplete={handleDayComplete} dayBusy={dayCompleteBusy} dayFeedback={dayCompleteFeedback} onNavigate={navigateWithSection} onQuick={handleQuick} onDataChanged={refreshCurrent} />
             )}
-            {tab === 'cockpit' && <CockpitView onAction={openAction} onAskAi={openAiWithDraft} />}
-            {tab === 'planning' && <PlanningView onAction={openAction} onAskAi={openAiWithDraft} refreshKey={planningRevision} scheduleText={dashboard?.scheduleText} onDataChanged={refreshCurrent} />}
-            {dashboard && tab === 'affairs' && <AffairsView pending={activePending} affairs={dashboard.affairs} onPrepare={openAction} onInspect={openItemDetail} onRetry={handleAffairRetry} retryingId={quickBusyId} feedback={affairFeedback} />}
+            {tab === 'planning' && <PlanningView onAction={openAction} onAskAi={openAiWithDraft} refreshKey={planningRevision} sectionHint={planningSectionHint} scheduleText={dashboard?.scheduleText} onDataChanged={refreshCurrent} />}
+            {tab === 'affairs' && <AffairsView onQuick={handleQuick} onPrepare={openAction} onInspect={openItemDetail} onRetry={handleAffairRetry} onRetryPrev={handleAffairRetryPrev} retryingId={quickBusyId} feedback={affairFeedback} refreshKey={planningRevision} observedAt={dashboard?.observedAt ?? ''} onOpenDay={(date, items, trigger) => openDayDetail(date, trigger, items)} localDate={dashboard?.localDate} />}
           </div>
         </main>
 
@@ -1006,8 +1201,10 @@ function Panel() {
               {contextView && dashboard && <ContextDrawerContent
                 view={contextView}
                 dashboard={dashboard}
+                onQuick={handleQuick}
                 onPrepare={openAction}
                 onRetry={handleAffairRetry}
+                onRetryPrev={handleAffairRetryPrev}
                 retryingId={quickBusyId}
                 affairFeedback={affairFeedback}
                 onSync={() => openAction({ operation: 'calendar_sync' })}
@@ -1033,6 +1230,7 @@ function Panel() {
                 onPreview={submitPreview}
                 onAiPreview={acceptPreview}
                 onCommit={commit}
+                onCommitBatch={commitBatch}
                 onClear={clearPreview}
                 onClose={closeActionDrawer}
               />
@@ -1044,7 +1242,7 @@ function Panel() {
   );
 }
 
-function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepare, onRetry, retryingId, affairFeedback, onDayComplete, dayBusy, dayFeedback }: {
+function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepare, onQuick, onRetry, onRetryPrev, retryingId, affairFeedback, onDayComplete, dayBusy, dayFeedback, onNavigate, onDataChanged }: {
   dashboard: Dashboard;
   pending: TimelineItem[];
   upcoming: TimelineItem | null;
@@ -1052,11 +1250,15 @@ function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepar
   onOpenDay: OpenDayHandler;
   onPrepare: (preset: ActionPreset) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
+  onRetryPrev?: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
   affairFeedback: Record<string, AffairFeedback>;
   onDayComplete: (date: string) => Promise<void>;
   dayBusy: boolean;
   dayFeedback: AffairFeedback | null;
+  onNavigate: (tab: Tab, section?: string) => void;
+  onQuick: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
+  onDataChanged: (options?: { silent?: boolean }) => Promise<unknown>;
 }) {
   const combinedItems = useMemo(() => {
     const map = new Map<string, TimelineItem>();
@@ -1088,29 +1290,32 @@ function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepar
 
   return (
     <div className="view-stack">
-      <section className="hero-row">
-        <div>
-          <p className="eyebrow">{dashboard.localDate} · {scopeLabels[dashboard.scope]}</p>
-          <h2>{headline}</h2>
-          <p className="subtle">数据来自排课与事务系统实时回读。</p>
-        </div>
-      </section>
+      <PageTitle
+        eyebrow={`${dashboard.localDate} · ${scopeLabels[dashboard.scope]}`}
+        title={headline}
+        description="数据来自排课与事务系统实时回读。"
+      />
 
-      <NextCourseBanner course={dashboard.nextCourse || null} advice={dashboard.commuteAdvice || null} onOpen={(trigger) => dashboard.nextCourse && onInspect(dashboard.nextCourse, trigger)} onPrepare={onPrepare} />
+      <div className="overview-duo">
+          <div className="panel pending-action-panel">
+            <PanelHeading title="待处理" meta={`${pending.length} 项`} />
+            {pending.length ? pending.slice(0, 4).map((item) => <QuickPendingItem key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onRetry={onRetry} onRetryPrev={onRetryPrev} retryingId={retryingId} feedback={affairFeedback[item.id]} />) : <Empty title="没有待处理事务" text="当前队列是干净的。" compact />}
+          </div>
+          <SuggestionCards observedAt={dashboard.observedAt} onPrepare={onPrepare} onOpenDay={onOpenDay} onNavigate={onNavigate} onRetry={onRetry} onDataChanged={onDataChanged} />
+      </div>
 
-      <section className="metrics-grid">
-        <Metric label="课程" value={dashboard.courses.length} hint={formatRange(dashboard.range)} tone="sage" />
-        <Metric label="待办" value={pending.length} hint={pending[0]?.title || '没有积压'} tone="amber" />
-        <Metric label="下一项" value={upcoming ? formatTime(itemDate(upcoming)) || '待定' : '无'} hint={upcoming?.title || '当前范围内已清空'} tone="blue" />
-        <Metric label="系统" value={dashboard.health?.ok ? '正常' : '异常'} hint={`活动事务 ${dashboard.health?.database?.verification?.counts?.active ?? '—'}`} tone="ink" />
-      </section>
 
+
+
+
+
+<NextCourseBanner course={dashboard.nextCourse || null} advice={dashboard.commuteAdvice || null} onOpen={(trigger) => dashboard.nextCourse && onInspect(dashboard.nextCourse, trigger)} onPrepare={onPrepare} onQuick={onQuick} />
       {dashboard.scope === 'today' && todayCourses.length > 0 && <section className="day-complete-bar">
         <div>
           <p className="eyebrow">今日收课</p>
           <strong>{pendingToday.length ? `还有 ${pendingToday.length} 节待记录` : '今日课程已全部记录'}</strong>
           <span>{pendingToday.length && !dayEnded ? `最后一节 ${formatTime(finalEnd)} 结束后可操作` : '提交后会写入本地课表并同步日历'}</span>
-          {dayFeedback && <small className={dayFeedback.ok ? 'day-action-inline ok' : 'day-action-inline error'}>{dayFeedback.text}</small>}
+          {dayFeedback && <InlineResult ok={dayFeedback.ok} text={dayFeedback.text} />}
         </div>
         <button
           type="button"
@@ -1119,22 +1324,28 @@ function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepar
           onClick={() => void onDayComplete(dashboard.localDate)}
         >{dayButtonLabel}</button>
       </section>}
-
-      <section className="content-grid">
+      <section className="metrics-grid">
+        <Metric label="课程" value={dashboard.courses.length} hint={formatRange(dashboard.range)} tone="sage" />
+        <Metric label="待办" value={pending.length} hint={pending[0]?.title || '没有积压'} tone="amber" />
+        <Metric label="下一项" value={upcoming ? formatTime(itemDate(upcoming)) || '待定' : '无'} hint={upcoming?.title || '当前范围内已清空'} tone="blue" />
+        <Metric label="系统" value={dashboard.health?.ok ? '正常' : '异常'} hint={`活动事务 ${dashboard.health?.database?.verification?.counts?.active ?? '—'}`} tone="ink" />
+      </section>
         <div className={dashboard.scope === 'week' || dashboard.scope === 'month' ? 'panel wide calendar-panel' : 'panel wide'}>
           <PanelHeading
             title={dashboard.scope === 'week' ? '周视图' : dashboard.scope === 'month' ? '月视图' : '时间轴'}
             meta={formatRange(dashboard.range)}
           />
           {(dashboard.scope === 'week' || dashboard.scope === 'month') && <div className="calendar-legend" aria-label="状态颜色图例">
-            <span className="confirmed"><i />已确认／已完成</span>
+            <span className="confirmed"><i />已确认</span>
             <span className="pending"><i />待确认／待处理</span>
+            <span className="finished"><i />已完成·留痕</span>
+            <span className="muted"><i />已取消</span>
             <span className="error"><i />错误／硬阻塞</span>
             <span className="temporary"><i />临时身份</span>
-            <small>状态用绿黄红；蓝色只标记临时来源</small>
+            <small>石板色=上过课留痕；过期未标记的课程以琥珀“过期”提示，待补标记</small>
           </div>}
           {dashboard.scope === 'week'
-            ? <WeekCalendar items={combinedItems} range={dashboard.range} localDate={dashboard.localDate} onInspect={onInspect} onOpenDay={onOpenDay} onPrepare={onPrepare} onRetry={onRetry} retryingId={retryingId} affairFeedback={affairFeedback} />
+            ? <WeekCalendar items={combinedItems} range={dashboard.range} localDate={dashboard.localDate} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onRetry={onRetry} retryingId={retryingId} affairFeedback={affairFeedback} />
             : dashboard.scope === 'month'
               ? <MonthCalendar items={combinedItems} range={dashboard.range} localDate={dashboard.localDate} onOpenDay={onOpenDay} />
               : groups.length ? groups.map(([date, items]) => (
@@ -1144,26 +1355,177 @@ function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepar
                     <span>{items.length} 项</span>
                   </div>
                   <div className="timeline-list">
-                    {items.map((item) => <TimelineRow key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onRetry={onRetry} retryingId={retryingId} feedback={affairFeedback[item.id]} />)}
+                    {items.map((item) => <TimelineRow key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onRetry={onRetry} retryingId={retryingId} feedback={affairFeedback[item.id]} />)}
                   </div>
                 </div>
               )) : <Empty title="这个范围没有安排" text="可以切换时间范围，或用 AI 操作创建和调整。" />}
         </div>
-
-        <aside className="side-stack overview-side">
-          <div className="panel pending-action-panel">
-            <PanelHeading title="待处理" meta={`${pending.length} 项`} />
-            {pending.length ? pending.slice(0, 4).map((item) => <QuickPendingItem key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onRetry={onRetry} retryingId={retryingId} feedback={affairFeedback[item.id]} />) : <Empty title="没有待处理事务" text="当前队列是干净的。" compact />}
-          </div>
-        </aside>
-      </section>
     </div>
   );
 }
 
-function ItemActionButtons({ item, onPrepare, onRetry, retryingId, feedback, compact = false }: {
-  item: TimelineItem;
+function SuggestionCards({ observedAt, onPrepare, onOpenDay, onNavigate, onRetry, onDataChanged }: {
+  observedAt: string;
   onPrepare: (preset: ActionPreset) => void;
+  onOpenDay: (date: string, trigger?: HTMLElement | null) => void;
+  onNavigate: (tab: Tab, section?: string) => void;
+  onRetry: (item: TimelineItem) => Promise<void>;
+  onDataChanged?: (options?: { silent?: boolean }) => Promise<unknown>;
+}) {
+  const [data, setData] = useState<{ cards: SuggestionCard[] } | null>(() => readWorkbenchCache<{ cards: SuggestionCard[] }>('suggestions'));
+  const [dismissed, setDismissed] = useState<string[]>(() => {
+    try {
+      return JSON.parse(window.sessionStorage.getItem('laosu-workbench.suggestions.dismissed') || '[]') as string[];
+    } catch {
+      return [];
+    }
+  });
+  const load = useCallback((fresh: boolean) => {
+    void api<{ cards: SuggestionCard[] }>(`api/suggestions${fresh ? '?fresh=1' : ''}`).then((res) => {
+      if (!res?.cards) return;
+      setData(res);
+      writeWorkbenchCache('suggestions', res);
+    }).catch(() => {});
+  }, []);
+  useEffect(() => { void load(true); }, [load]);
+  useEffect(() => {
+    if (observedAt) void load(false);
+  }, [observedAt, load]);
+
+  function dismiss(id: string) {
+    setDismissed((current) => {
+      const next = current.includes(id) ? current : [...current, id];
+      try {
+        window.sessionStorage.setItem('laosu-workbench.suggestions.dismissed', JSON.stringify(next));
+      } catch {
+        // 存储失败仅影响收起记忆。
+      }
+      return next;
+    });
+  }
+
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, { ok: boolean; text: string }>>({});
+
+  // 点了就办：执行在后台完成（预演+提交+回读），成功即收起并回扫数据。
+  async function runCard(card: SuggestionCard, resolution?: 'done' | 'cancelled') {
+    if (busyId) return;
+    const id = card.id;
+    setBusyId(id);
+    setResults((current) => ({ ...current, [id]: { ok: true, text: '正在处理…' } }));
+    try {
+      let data: any;
+      if (card.action.kind === 'overdue' && resolution === 'done') {
+        data = await api<any>('api/courses/overdue-complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student: card.action.student, date: card.action.date }),
+        });
+      } else if (card.action.kind === 'overdue') {
+        data = await api<any>('api/courses/cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ student: card.action.student, date: card.action.date, time: card.action.time, reason: '没上' }),
+        });
+      } else if (card.action.operation === 'calendar_sync') {
+        data = await api<any>('api/calendar/sync-quick', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(card.action.input ?? {}),
+        });
+      } else if (card.action.operation === 'quarantine_overdue') {
+        data = await api<any>('api/courses/quarantine-quick', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+      } else {
+        throw new Error('该建议不支持一键执行');
+      }
+      if (!data.ok) throw new Error(data.error || '处理未完成');
+      setResults((current) => ({ ...current, [id]: { ok: true, text: data.message || '已处理' } }));
+      dismiss(id);
+      void load(true);
+      void onDataChanged?.({ silent: true });
+    } catch (err: any) {
+      setResults((current) => ({ ...current, [id]: { ok: false, text: `处理失败：${err.message || '未知错误'}` } }));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function runBackfill(card: SuggestionCard) {
+    if (busyId) return;
+    const id = card.id;
+    setBusyId(id);
+    setResults((current) => ({ ...current, [id]: { ok: true, text: '正在补齐…' } }));
+    try {
+      const data = await api<any>('api/affairs/backfill-end', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: card.action.ids ?? [] }),
+      });
+      if (!data.ok) throw new Error(data.error || '补齐未完成');
+      setResults((current) => ({ ...current, [id]: { ok: true, text: data.message || '已补齐' } }));
+      dismiss(id);
+      void load(true);
+      void onDataChanged?.({ silent: true });
+    } catch (err: any) {
+      setResults((current) => ({ ...current, [id]: { ok: false, text: `补齐失败：${err.message || '未知错误'}` } }));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const cards = (data?.cards ?? []).filter((card) => !dismissed.includes(card.id));
+  if (!cards.length) return null;
+  return (
+    <section className="panel" aria-label="建议处理">
+      <PanelHeading title="建议处理" meta={`${cards.length} 项`} />
+      <div>
+        {cards.map((card) => {
+          const toneValue = card.tone === 'urgent' ? '异常' : card.tone === 'warn' ? '待确认' : 'scheduled';
+          return (
+            <div className="quick-pending-item contextual-action-host actionable action-open" key={card.id}>
+              <div className="quick-pending-main">
+                <strong>{card.title}</strong>
+                <span>{card.detail}</span>
+                {results[card.id] && <InlineResult ok={results[card.id].ok} text={results[card.id].text} />}
+              </div>
+              <div className="quick-pending-actions"><Status value={toneValue} /></div>
+              <div className="quick-pending-inline-action">
+                {card.action.kind === 'overdue' && <>
+                  <button type="button" className="primary" disabled={busyId === card.id} onClick={() => void runCard(card, 'done')}>{busyId === card.id ? '处理中…' : card.action.label}</button>
+                  <button type="button" className="secondary" disabled={Boolean(busyId)} onClick={() => void runCard(card, 'cancelled')}>{card.action.cancelLabel || '没上'}</button>
+                </>}
+                {card.action.kind === 'backfill' && <button type="button" className="primary" disabled={Boolean(busyId)} onClick={() => void runBackfill(card)}>{busyId === card.id ? '处理中…' : card.action.label}</button>}
+                {card.action.kind === 'preview' && <button type="button" className="primary" disabled={Boolean(busyId)} onClick={() => {
+                  const operation = card.action.operation;
+                  if (operation === 'calendar_sync' || operation === 'quarantine_overdue') {
+                    void runCard(card);
+                    return;
+                  }
+                  onPrepare({ operation: operation ?? '', ...(card.action.input ?? {}) });
+                }}>{busyId === card.id ? '处理中…' : card.action.label}</button>}
+                {card.action.kind === 'retryNext' && <button type="button" className="secondary" disabled={Boolean(busyId)} onClick={() => {
+                  const item: TimelineItem = { id: card.action.id ?? '', version: card.action.version, retry: {}, domain: 'affair', title: card.action.title ?? card.title, status: 'pending_confirmation' };
+                  void onRetry(item);
+                }}>{card.action.label}</button>}
+                {card.action.kind === 'openDay' && <button type="button" className="secondary" disabled={Boolean(busyId)} onClick={(event) => onOpenDay(card.action.date ?? '', event.currentTarget)}>{card.action.label}</button>}
+                {card.action.kind === 'navigate' && <button type="button" className="secondary" disabled={Boolean(busyId)} onClick={() => onNavigate((card.action.tab ?? 'planning') as Tab, card.action.section)}>{card.action.label}</button>}
+                <button type="button" className="quiet-danger" onClick={() => dismiss(card.id)}>收起</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ItemActionButtons({ item, onQuick, onRetry, retryingId, feedback, compact = false }: {
+  item: TimelineItem;
+  onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
   onRetry?: (item: TimelineItem) => Promise<void>;
   retryingId?: string | null;
   feedback?: AffairFeedback;
@@ -1173,24 +1535,48 @@ function ItemActionButtons({ item, onPrepare, onRetry, retryingId, feedback, com
   if (finished) return null;
   const date = item.start_at?.slice(0, 10);
   const time = item.start_at?.slice(11, 16);
+  // 交互铁律：一到两步的事按钮点一下（内部预演+提交+回读），两步以上的事交给 AI。
   if (item.domain === 'course') {
-    if (!date || !time) return null;
+    if (!date || !time || !onQuick) return null;
     return <div className={`item-action-buttons${compact ? ' compact' : ''}`} onClick={(event) => event.stopPropagation()}>
-      <button type="button" className="secondary" onClick={() => onPrepare({ operation: 'course_move', student: item.title, fromDate: date, fromTime: time, toDate: date, toTime: time, duration: item.duration })}>调整时间</button>
-      <button type="button" className="danger" onClick={() => onPrepare({ operation: 'course_cancel', student: item.title, date, time })}>本次不上</button>
+      <button type="button" className="danger" onClick={() => onQuick('courseCancel', item)}>本次不上</button>
     </div>;
   }
   const retrying = retryingId === item.id;
   return <div className={`item-action-buttons${compact ? ' compact' : ''}`} onClick={(event) => event.stopPropagation()}>
-    <button type="button" className="primary" onClick={() => onPrepare({ operation: 'affair_complete', id: item.id, expectedVersion: item.version })}>完成</button>
+    <button type="button" className="primary" disabled={Boolean(retryingId) || feedback?.ok} onClick={() => onQuick?.('affairComplete', item)}>{feedback?.ok ? '已完成' : '完成'}</button>
     {item.retry && onRetry
       ? <button type="button" className="secondary" disabled={Boolean(retryingId) || Boolean(feedback?.ok)} aria-busy={retrying} onClick={() => void onRetry(item)}>{retrying ? '处理中…' : feedback?.buttonLabel || '没约上'}</button>
-      : <button type="button" className="danger" onClick={() => onPrepare({ operation: 'affair_cancel', id: item.id, expectedVersion: item.version })}>取消</button>}
+      : null}
   </div>;
 }
 
 function maximumLaneCount(items: CalendarItemLike[]) {
   return layoutOverlappingItems(items)[0]?.laneCount || 1;
+}
+
+// 周视图列数随容器宽度连续自适应：时间轴 52px，每天保底 150px，1–7 天。
+// 单日聚焦时固定 1 列；未量测到宽度前按 7 天渲染，避免首帧闪跳。
+const WEEK_AXIS_WIDTH = 52;
+const DAY_MIN_WIDTH = 150;
+
+function useAdaptiveVisibleDays(scrollRef: React.RefObject<HTMLDivElement | null>, focused: boolean) {
+  const [containerWidth, setContainerWidth] = useState(0);
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (width && Number.isFinite(width)) setContainerWidth(width);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [scrollRef]);
+  if (focused) return { visibleDays: 1, paginated: false };
+  if (!containerWidth) return { visibleDays: 7, paginated: false };
+  const fits = Math.floor((containerWidth - WEEK_AXIS_WIDTH) / DAY_MIN_WIDTH);
+  const visibleDays = Math.max(1, Math.min(7, fits));
+  return { visibleDays, paginated: visibleDays < 7 };
 }
 
 function useHorizontalDrag() {
@@ -1225,54 +1611,54 @@ function useHorizontalDrag() {
   return { ref, onPointerDown, onPointerMove, onPointerUp: finish, onPointerCancel: finish };
 }
 
-function WeekCalendar({ items, range, localDate, onInspect, onOpenDay, onPrepare, onRetry, retryingId, affairFeedback }: {
+function WeekCalendar({ items, range, localDate, onInspect, onPrepare, onQuick, onRetry, retryingId, affairFeedback }: {
   items: TimelineItem[];
   range: string;
   localDate: string;
   onInspect: InspectHandler;
-  onOpenDay: OpenDayHandler;
   onPrepare: (preset: ActionPreset) => void;
+  onQuick: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
   affairFeedback: Record<string, AffairFeedback>;
 }) {
   const dates = useMemo(() => buildWeekDates(range, localDate), [range, localDate]);
   const dragScroll = useHorizontalDrag();
-  const [compactDays, setCompactDays] = useState(() => window.matchMedia('(max-width: 900px)').matches);
   const [dayPage, setDayPage] = useState(0);
-  const [openedItemId, setOpenedItemId] = useState<string | null>(null);
-  const visibleDateSlots = useMemo<Array<string | null>>(() => compactDays ? buildWeekPageSlots(dates, dayPage, 3) : dates, [compactDays, dates, dayPage]);
-
-  useEffect(() => {
-    const media = window.matchMedia('(max-width: 900px)');
-    const update = () => setCompactDays(media.matches);
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
+  const [focusDate, setFocusDate] = useState<string | null>(null);
+  const { visibleDays, paginated } = useAdaptiveVisibleDays(dragScroll.ref, Boolean(focusDate));
+  const pageCount = Math.max(1, Math.ceil(7 / Math.max(1, visibleDays)));
+  const visibleDateSlots = useMemo<Array<string | null>>(
+    () => (focusDate ? [focusDate] : paginated ? buildWeekPageSlots(dates, dayPage, visibleDays) : dates),
+    [dates, dayPage, focusDate, paginated, visibleDays],
+  );
 
   useEffect(() => {
     setDayPage(0);
-    setOpenedItemId(null);
-  }, [range]);
+  }, [range, visibleDays]);
 
   useEffect(() => {
-    if (!openedItemId) return undefined;
+    if (!focusDate) return undefined;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpenedItemId(null);
+      if (event.key === 'Escape') setFocusDate(null);
     };
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [openedItemId]);
+  }, [focusDate]);
 
+  // 画布留痕规则：只保留上过课（已完成·石板色）；过去的已取消/已调课不再回到画布，
+  // 过期未标记课程由 itemStateClass(…, localDate) 转为琥珀“过期”提示。
   const byDate = useMemo(() => {
     const map = new Map<string, TimelineItem[]>();
     items.forEach((item) => {
       const date = itemDateKey(item);
-      if (date) map.set(date, [...(map.get(date) || []), item]);
+      if (!date) return;
+      if (date < localDate && ['已取消', '已调课', 'cancelled'].includes(item.status)) return;
+      map.set(date, [...(map.get(date) || []), item]);
     });
     map.forEach((dayItems, date) => map.set(date, [...dayItems].sort((a, b) => String(itemDate(a) || '').localeCompare(String(itemDate(b) || '')))));
     return map;
-  }, [items]);
+  }, [items, localDate]);
   const laneCountsByDate = useMemo(() => new Map(dates.map((date) => [date, maximumLaneCount((byDate.get(date) || []).filter((item) => item.start_at || item.deadline_at))])), [byDate, dates]);
 
 const placementsByDate = useMemo(() => {
@@ -1287,32 +1673,35 @@ const placementsByDate = useMemo(() => {
   const visibleLaneWeights = visibleDateSlots.map((date) => date ? laneCountsByDate.get(date) || 1 : 1);
   const visibleLaneUnits = visibleLaneWeights.reduce((sum, count) => sum + count, 0);
   const gridTemplate = `52px ${visibleLaneWeights.map((count) => `minmax(0, ${count}fr)`).join(' ')}`;
-  const canvasMinWidth = compactDays ? `calc(100% * ${visibleLaneUnits / visibleDateSlots.length})` : `${Math.ceil(1080 * visibleLaneUnits / visibleDateSlots.length)}px`;
   const timedItems = items.filter((item) => item.start_at || item.deadline_at);
-  const visibleTimedItems = compactDays ? timedItems.filter((item) => visibleDateSlots.includes(itemDateKey(item))) : timedItems;
+  const visibleTimedItems = visibleDateSlots.length >= 7 ? timedItems : timedItems.filter((item) => visibleDateSlots.includes(itemDateKey(item)));
   const { startHour, endHour } = calendarHourBounds(visibleTimedItems);
-  const hourHeight = compactDays ? 76 : 64;
+  const hourHeight = focusDate ? 92 : visibleDays >= 6 ? 64 : visibleDays >= 4 ? 72 : 84;
   const calendarHeight = (endHour - startHour) * hourHeight;
   const hours = Array.from({ length: endHour - startHour + 1 }, (_, index) => startHour + index);
 
   return (
     <>
-      {compactDays && <div className="planning-day-page-nav overview-week-page-nav" role="group" aria-label="切换本周日期页">
+      {focusDate ? <div className="planning-day-page-nav overview-week-page-nav" role="group" aria-label="单日聚焦视图">
+        <button type="button" onClick={() => setFocusDate(null)}>‹ 返回整周</button>
+        <strong>{formatDate(`${focusDate}T12:00:00+08:00`, { month: 'long', day: 'numeric', weekday: 'long' })} · 单日视图</strong>
+        <span aria-hidden="true" />
+      </div> : paginated && <div className="planning-day-page-nav overview-week-page-nav" role="group" aria-label="切换本页日期">
         <button type="button" disabled={dayPage === 0} onClick={() => setDayPage((current) => Math.max(0, current - 1))}>‹ 上一页</button>
-        <strong>第 {dayPage + 1}/3 页 · 每页 3 天</strong>
-        <button type="button" disabled={dayPage === 2} onClick={() => setDayPage((current) => Math.min(2, current + 1))}>下一页 ›</button>
+        <strong>第 {dayPage + 1}/{pageCount} 页 · 每页 {visibleDays} 天</strong>
+        <button type="button" disabled={dayPage >= pageCount - 1} onClick={() => setDayPage((current) => Math.min(pageCount - 1, current + 1))}>下一页 ›</button>
       </div>}
-      <div className="week-calendar-scroll draggable-week-scroll" role="region" tabIndex={0} aria-label="一周时间视图，可使用方向键或触控横向浏览" {...dragScroll}>
-      <div className={compactDays ? 'week-calendar-canvas compact-page' : 'week-calendar-canvas'} style={{ minWidth: canvasMinWidth }}>
+      <div className="week-calendar-scroll draggable-week-scroll" role="region" tabIndex={0} aria-label="时间视图，点击日期标题聚焦到单日" {...dragScroll}>
+      <div className="week-calendar-canvas" style={{ minWidth: 0 }}>
         <div className="week-calendar-header" style={{ gridTemplateColumns: gridTemplate }}>
           <div className="week-corner">时间</div>
-          {visibleDateSlots.map((date, slotIndex) => date ? <button type="button" key={date} className={date === localDate ? 'week-day-header today' : 'week-day-header'} onClick={(event) => onOpenDay(date, event.currentTarget)}>
+          {visibleDateSlots.map((date, slotIndex) => date ? <button type="button" key={date} className={date === localDate ? 'week-day-header today' : 'week-day-header'} onClick={() => setFocusDate(date)} aria-label={`聚焦到 ${formatDate(`${date}T12:00:00+08:00`, { month: 'long', day: 'numeric', weekday: 'long' })} 的单日视图`}>
             <span>{formatDate(`${date}T12:00:00+08:00`, { weekday: 'short' })}</span>
             <strong>{Number(date.slice(8, 10))}</strong>
             <small>{byDate.get(date)?.length || 0} 项</small>
           </button> : <div className="week-day-header empty-slot" key={`empty-${slotIndex}`} aria-hidden="true" />)}
         </div>
-        <div className="week-calendar-body" style={{ gridTemplateColumns: gridTemplate }} onPointerDown={(event) => { if (!(event.target as HTMLElement).closest('.week-time-block')) setOpenedItemId(null); }}>
+        <div className="week-calendar-body" style={{ gridTemplateColumns: gridTemplate }}>
           <div className="week-time-axis" style={{ height: calendarHeight }}>
             {hours.map((hour) => <span key={hour} style={{ top: (hour - startHour) * hourHeight }}>{String(hour).padStart(2, '0')}:00</span>)}
           </div>
@@ -1327,39 +1716,29 @@ const placementsByDate = useMemo(() => {
                 const timeValue = item.start_at || item.deadline_at;
                 const finished = ['completed', 'cancelled', '已完成', '已取消', '已调课'].includes(item.status);
                 const actionable = !finished && (item.domain === 'affair' || Boolean(item.start_at));
-                const actionOpen = actionable && openedItemId === item.id;
+                const overdue = courseOverdue(item, localDate);
                 return <article
                   key={item.id}
-                  className={`week-time-block contextual-action-host ${item.domain} ${itemStateClass(item)}${isTemporaryItem(item) ? ' temporary' : ''}${actionable ? ' actionable' : ''}${actionOpen ? ' action-open' : ''}`}
+                  className={`week-time-block contextual-action-host ${item.domain} ${itemStateClass(item, localDate)}${isTemporaryItem(item) ? ' temporary' : ''}${actionable ? ' actionable' : ''}`}
                   style={{ top: geometry.top, height: geometry.height, left: `calc(${lane * width}% + 4px)`, width: `calc(${width}% - 8px)` }}
                   tabIndex={0}
                   role="button"
-                  aria-expanded={actionable ? actionOpen : undefined}
                   onClick={(event) => {
                     if ((event.target as HTMLElement).closest('button')) return;
-                    if (actionable && window.matchMedia('(hover: none)').matches) {
-                      setOpenedItemId((current) => current === item.id ? null : item.id);
-                    } else {
-                      onInspect(item, event.currentTarget);
-                    }
+                    onInspect(item, event.currentTarget);
                   }}
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
+                    if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
                       onInspect(item, event.currentTarget);
-                    } else if (event.key === ' ') {
-                      event.preventDefault();
-                      if (actionable) setOpenedItemId((current) => current === item.id ? null : item.id);
-                    } else if (event.key === 'Escape') {
-                      setOpenedItemId(null);
                     }
                   }}
                   data-item-id={item.id}
-                  aria-label={`${formatTime(timeValue)} ${item.title}，${item.domain === 'course' ? `${item.duration || '—'} 分钟课程` : '事务'}${actionable ? '；移入后可直接操作，Enter 打开详情' : '，打开详情'}`}
+                  aria-label={`${formatTime(timeValue)} ${item.title}${overdue ? '（已过期待标记）' : ''}，${item.domain === 'course' ? `${item.duration || '—'} 分钟课程` : '事务'}${actionable ? '；移入后可直接操作，Enter 打开详情' : '，打开详情'}`}
                 >
-                  <strong>{formatTime(timeValue)} · {item.title}</strong>
+                  <strong>{formatTime(timeValue)} · {item.title}{overdue ? '（过期）' : ''}</strong>
                   <span>{item.domain === 'course' ? `${item.duration || '—'} 分钟` : item.estimated_minutes ? `${item.estimated_minutes} 分钟 · 事务` : '事务'}</span>
-                  {actionable && <div className="week-card-inline-action"><ItemActionButtons item={item} onPrepare={(preset) => { setOpenedItemId(null); onPrepare(preset); }} onRetry={onRetry} retryingId={retryingId} feedback={affairFeedback[item.id]} compact /></div>}
+                  {actionable && <div className="week-card-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onRetry={onRetry} retryingId={retryingId} feedback={affairFeedback[item.id]} compact /></div>}
                 </article>;
               })}
             </div>;
@@ -1383,11 +1762,13 @@ function MonthCalendar({ items, range, localDate, onOpenDay }: {
     const map = new Map<string, TimelineItem[]>();
     items.forEach((item) => {
       const date = itemDateKey(item);
-      if (date) map.set(date, [...(map.get(date) || []), item]);
+      if (!date) return;
+      if (date < localDate && ['已取消', '已调课', 'cancelled'].includes(item.status)) return;
+      map.set(date, [...(map.get(date) || []), item]);
     });
     map.forEach((dayItems, date) => map.set(date, [...dayItems].sort((a, b) => String(itemDate(a) || '').localeCompare(String(itemDate(b) || '')))));
     return map;
-  }, [items]);
+  }, [items, localDate]);
   const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
 
   return (
@@ -1403,8 +1784,8 @@ function MonthCalendar({ items, range, localDate, onOpenDay }: {
             return <button type="button" className={classes.join(' ')} key={date} onClick={(event) => onOpenDay(date, event.currentTarget)}>
               <header><strong>{Number(date.slice(8, 10))}</strong><span>{dayItems.length ? `${dayItems.length} 项` : ''}</span></header>
               <div className="month-item-list">
-                {dayItems.slice(0, 3).map((item) => <span key={item.id} className={`month-item ${item.domain} ${itemStateClass(item)}${isTemporaryItem(item) ? ' temporary' : ''}`}>
-                  <i />{formatTime(itemDate(item)) || '待定'} · {item.title}
+                {dayItems.slice(0, 3).map((item) => <span key={item.id} className={`month-item ${item.domain} ${itemStateClass(item, localDate)}${isTemporaryItem(item) ? ' temporary' : ''}`}>
+                  <i />{formatTime(itemDate(item)) || '待定'} · {item.title}{courseOverdue(item, localDate) ? '（过期）' : ''}
                 </span>)}
                 {dayItems.length > 3 && <span className="month-more">＋{dayItems.length - 3} 项</span>}
               </div>
@@ -1441,15 +1822,16 @@ function minutesToText(minutes: number) {
   return String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0');
 }
 
-function CockpitView({ onAction, onAskAi }: { onAction: (preset: ActionPreset) => void; onAskAi: (draft: string) => void }) {
-  const [data, setData] = useState<CockpitData | null>(null);
-  const [loading, setLoading] = useState(true);
+function CockpitView({ onAction, onAskAi, refreshKey = 0 }: { onAction: (preset: ActionPreset) => void; onAskAi: (draft: string) => void; refreshKey?: number }) {
+  const [data, setData] = useState<CockpitData | null>(() => readWorkbenchCache<CockpitData>('cockpit'));
+  const [loading, setLoading] = useState(!data);
   const [error, setError] = useState('');
-  const load = useCallback(async (silent = false) => {
+  const load = useCallback(async (silent = false, fresh = false) => {
     if (!silent) setLoading(true);
     try {
-      const result = await api<CockpitData>('api/cockpit');
+      const result = await api<CockpitData>('api/cockpit' + (fresh ? '?fresh=1' : ''));
       setData(result);
+      writeWorkbenchCache('cockpit', result);
       setError('');
       return true;
     } catch (err: any) {
@@ -1459,7 +1841,10 @@ function CockpitView({ onAction, onAskAi }: { onAction: (preset: ActionPreset) =
       setLoading(false);
     }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(!data); }, [load]);
+  useEffect(() => {
+    if (refreshKey > 0) void load(true, true);
+  }, [refreshKey]);
   const groups = useMemo(() => {
     const map = new Map<string, CockpitData['students']>();
     for (const student of data?.students ?? []) {
@@ -1546,10 +1931,10 @@ function CockpitView({ onAction, onAskAi }: { onAction: (preset: ActionPreset) =
   );
 }
 
-function PlanningView({ onAction, onAskAi, refreshKey, scheduleText, onDataChanged }: { onAction: (preset: ActionPreset) => void; onAskAi: (draft: string) => void; refreshKey: number; scheduleText?: string; onDataChanged: (options?: { silent?: boolean }) => Promise<unknown> }) {
-  const [planning, setPlanning] = useState<PlanningData | null>(null);
+function PlanningView({ onAction, onAskAi, refreshKey, sectionHint, scheduleText, onDataChanged }: { onAction: (preset: ActionPreset) => void; onAskAi: (draft: string) => void; refreshKey: number; sectionHint?: { section: PlanningSection; nonce: number } | null; scheduleText?: string; onDataChanged: (options?: { silent?: boolean }) => Promise<unknown> }) {
+  const [planning, setPlanning] = useState<PlanningData | null>(() => readWorkbenchCache<PlanningData>('planning'));
   const [planningError, setPlanningError] = useState('');
-  const [planningSection, setPlanningSection] = useState<'calendar' | 'readiness' | 'students' | 'candidates' | 'review'>('calendar');
+  const [planningSection, setPlanningSection] = useState<PlanningSection>('calendar');
   const [studentFilter, setStudentFilter] = useState<'issues' | 'all' | 'availability' | 'zone' | 'pending'>('issues');
   const [showAllStudents, setShowAllStudents] = useState(false);
   const [templateCheck, setTemplateCheck] = useState<TemplateCheck | null>(null);
@@ -1558,10 +1943,16 @@ function PlanningView({ onAction, onAskAi, refreshKey, scheduleText, onDataChang
   const [reservationFeedback, setReservationFeedback] = useState<Record<string, { ok: boolean; text: string }>>({});
 
   useEffect(() => {
+    if (sectionHint?.section) setPlanningSection(sectionHint.section);
+  }, [sectionHint?.nonce]);
+
+  useEffect(() => {
     let cancelled = false;
-    void api<PlanningData>('api/planning').then((data) => {
+    void api<PlanningData>(`api/planning${refreshKey > 0 ? '?fresh=1' : ''}`).then((data) => {
       if (cancelled) return;
-      setPlanning(assertPlanningData(data));
+      const validated = assertPlanningData(data);
+      setPlanning(validated);
+      writeWorkbenchCache('planning', validated);
       setPlanningError('');
       setTemplateCheck(null);
     }).catch((error) => {
@@ -1593,6 +1984,32 @@ function PlanningView({ onAction, onAskAi, refreshKey, scheduleText, onDataChang
       setTemplateCheck({ ok: false, passed: false, monday: planning.weekMonday, output: '', affectedDates: [], error: error.message });
     } finally {
       setCheckingTemplate(false);
+    }
+  }
+
+  async function cancelReservation(reservationId: string) {
+    if (confirmingReservationId) return;
+    setConfirmingReservationId(reservationId);
+    setReservationFeedback((current) => ({ ...current, [reservationId]: { ok: true, text: '正在取消预留…' } }));
+    try {
+      const data = await api<any>('api/reservations/cancel-quick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reservationId }),
+      });
+      if (!data.ok) throw new Error(data.error || '取消预留未完成');
+      setPlanning((current) => current ? {
+        ...current,
+        reservations: current.reservations.map((reservation) => reservation.reservation_id === reservationId
+          ? { ...reservation, status: '已取消' }
+          : reservation),
+      } : current);
+      setReservationFeedback((current) => ({ ...current, [reservationId]: { ok: true, text: data.message || '已取消预留' } }));
+      void onDataChanged({ silent: true });
+    } catch (error: any) {
+      setReservationFeedback((current) => ({ ...current, [reservationId]: { ok: false, text: `取消失败：${error.message || '未知错误'}` } }));
+    } finally {
+      setConfirmingReservationId(null);
     }
   }
 
@@ -1652,19 +2069,26 @@ function PlanningView({ onAction, onAskAi, refreshKey, scheduleText, onDataChang
       {failedSources.length > 0 && <Notice tone="warn" title={`${failedSources.length} 项筹备数据读取异常`} text={failedSources.map((source) => `${source.label}：${source.message || '读取失败'}`).join('；')} />}
       {summary.reservationHardBlockerCount > 0 && <Notice tone="warn" title={`${summary.reservationHardBlockerCount} 条预留存在确认硬阻塞`} text={planning.audit.reservation_hard_blockers.map((item) => `${item.student} ${item.date}：${item.reasons.join('、')}`).join('；')} />}
 
-      <nav className="planning-subnav" aria-label="筹备页内部导航">
-        {([
-          ['calendar', '周视图', planning.reservations.length + planning.templates.length],
-          ['readiness', '准备度', summary.unzonedCount + summary.missingAvailabilityCount + summary.unconfirmedActiveCount],
-          ['students', '学生资料', planning.students.filter((student) => student.issues.length).length],
-          ['candidates', '候选与预留', templateIssueCount + summary.reservationCount],
-          ['review', '复核与证据', summary.reviewCount + summary.overdueCount + failedSources.length],
-        ] as const).map(([value, label, count]) => <button type="button" key={value} className={planningSection === value ? 'selected' : ''} aria-label={`${label}${count > 0 ? `，${count} 项` : ''}`} aria-pressed={planningSection === value} onClick={() => setPlanningSection(value)}><span>{label}</span>{count > 0 && <strong>{count}</strong>}</button>)}
-      </nav>
+      <WorkbenchNav
+        label="筹备页内部导航"
+        value={planningSection}
+        onChange={(next) => setPlanningSection(next as typeof planningSection)}
+        items={[
+          { id: 'calendar', label: '周视图', count: planning.reservations.length + planning.templates.length },
+          { id: 'trial', label: '试排' },
+          { id: 'students', label: '学生与准备度', count: summary.unzonedCount + summary.missingAvailabilityCount + summary.unconfirmedActiveCount + planning.students.filter((student) => student.issues.length).length },
+          { id: 'candidates', label: '预留与复核', count: templateIssueCount + summary.reservationCount + summary.reviewCount + summary.overdueCount + failedSources.length },
+        ]}
+      />
 
-      <PlanningWeekView planning={planning} hidden={planningSection !== 'calendar'} onConfirmReservation={confirmReservation} onAction={onAction} confirmingReservationId={confirmingReservationId} reservationFeedback={reservationFeedback} />
+      <PlanningWeekView planning={planning} hidden={planningSection !== 'calendar'} onConfirmReservation={confirmReservation} onCancelReservation={cancelReservation} onAction={onAction} confirmingReservationId={confirmingReservationId} reservationFeedback={reservationFeedback} />
 
-      <section className="planning-stage-grid" aria-label="筹备进度" hidden={planningSection !== 'readiness'}>
+      <div hidden={planningSection !== 'trial'}>
+        <PageTitle eyebrow="排课驾驶舱" title="一周试排" description="左看诊断，中看空档；点空档直接开预留，卡片一键交 AI。" />
+        <CockpitView onAction={onAction} onAskAi={onAskAi} refreshKey={refreshKey} />
+      </div>
+
+      <section className="planning-stage-grid" aria-label="筹备进度" hidden={planningSection !== 'students'}>
         <div className="planning-stage primary">
           <span>01 · 资料准备</span><strong>{coreReadyCount}/{summary.activeStudentCount}</strong><small>{readinessPercent}% 学生资料可用于排课</small>
           <div className="readiness-bar"><i style={{ width: `${readinessPercent}%` }} /></div>
@@ -1680,18 +2104,9 @@ function PlanningView({ onAction, onAskAi, refreshKey, scheduleText, onDataChang
         </div>
       </section>
 
-      <section className="planning-summary-strip" hidden={planningSection !== 'readiness'}>
-        <span><i className="dot amber" />未分区 <strong>{summary.unzonedCount}</strong></span>
-        <span><i className="dot blue" />缺候选时间 <strong>{summary.missingAvailabilityCount}</strong></span>
-        <span><i className="dot ink" />未确认在读 <strong>{summary.unconfirmedActiveCount}</strong></span>
-        <span><i className="dot sage" />待定名单 <strong>{summary.pendingCount}</strong></span>
-        <span><i className="dot rose" />出游约束 <strong>{summary.activeVacationCount}</strong></span>
-        <span className="planning-contract">contract {planning.contract.version ?? '—'} · schema {planning.contract.schemaVersion ?? '—'} · {formatRange(planning.range)}</span>
-      </section>
-
-      <section className="planning-overview-grid" hidden={planningSection !== 'readiness'}>
+      <section className="planning-overview-grid" hidden={planningSection !== 'students'}>
         <div className="panel planning-overview-card">
-          <div><p className="eyebrow">当前优先级</p><h3>先把学生资料补到可排</h3><span>{summary.activeStudentCount - coreReadyCount} 人仍有关键资料缺口。</span></div>
+          <div><p className="eyebrow">当前优先级</p><h3>先把学生资料补到可排</h3><span>{summary.activeStudentCount - coreReadyCount} 人仍有关键资料缺口。contract {planning.contract.version ?? '—'} · schema {planning.contract.schemaVersion ?? '—'} · {formatRange(planning.range)}</span></div>
           <div className="planning-overview-actions">
             <button type="button" onClick={() => { setStudentFilter('availability'); setPlanningSection('students'); }}>缺候选时间 {summary.missingAvailabilityCount}</button>
             <button type="button" onClick={() => { setStudentFilter('zone'); setPlanningSection('students'); }}>未分区 {summary.unzonedCount}</button>
@@ -1702,7 +2117,7 @@ function PlanningView({ onAction, onAskAi, refreshKey, scheduleText, onDataChang
           <div><p className="eyebrow">下一道关口</p><h3>{templateIssueCount ? '候选生成前还有时间重叠' : '可以进入候选预演'}</h3><span>{templateIssueCount} 项时间重叠；通勤缺口和长期候选时间差异都在排具体时间时提示。</span></div>
           <div className="planning-overview-actions">
             <button type="button" onClick={() => setPlanningSection('candidates')}>查看候选与预留</button>
-            {(summary.reviewCount + summary.overdueCount + failedSources.length) > 0 && <button type="button" onClick={() => setPlanningSection('review')}>处理复核与异常</button>}
+            {(summary.reviewCount + summary.overdueCount + failedSources.length) > 0 && <button type="button" onClick={() => setPlanningSection('candidates')}>处理复核与异常</button>}
           </div>
         </div>
       </section>
@@ -1783,7 +2198,7 @@ function PlanningView({ onAction, onAskAi, refreshKey, scheduleText, onDataChang
         </div>
       </section>
 
-      {planningSection === 'review' && (planning.reviews.length > 0 || summary.overdueCount > 0) && <section className="panel review-queue-panel">
+      {planningSection === 'candidates' && (planning.reviews.length > 0 || summary.overdueCount > 0) && <section className="panel review-queue-panel">
         <PanelHeading title="历史课程复核" meta={`${planning.reviews.length} 节待确认 · ${summary.overdueCount} 节过期待转入`} action={summary.overdueCount ? `处理 ${summary.overdueCount} 节过期课` : undefined} onAction={summary.overdueCount ? () => onAction({ operation: 'quarantine_overdue' }) : undefined} />
         <div className="review-card-list">{planning.reviews.map((course) => <article className="review-card" key={course.course_id}>
           <div><strong>{course.student}</strong><span>{course.date} · {course.start_time}-{course.end_time}</span></div>
@@ -1791,9 +2206,9 @@ function PlanningView({ onAction, onAskAi, refreshKey, scheduleText, onDataChang
         </article>)}</div>
       </section>}
 
-      {planningSection === 'review' && planning.reviews.length === 0 && summary.overdueCount === 0 && <section className="panel"><Empty title="当前没有待复核课程" text="过期课程和人工复核队列均已清空。" compact /></section>}
+      {planningSection === 'candidates' && planning.reviews.length === 0 && summary.overdueCount === 0 && <section className="panel"><Empty title="当前没有待复核课程" text="过期课程和人工复核队列均已清空。" compact /></section>}
 
-      <section className="planning-detail-grid" hidden={planningSection !== 'review'}>
+      <section className="planning-detail-grid" hidden={planningSection !== 'candidates'}>
         <details className="raw-details panel">
           <summary>复核口径与运行状态</summary>
           <div className="planning-detail-content">
@@ -1834,10 +2249,11 @@ type PlanningWeekEntry = {
   end_at: string;
 };
 
-function PlanningWeekView({ planning, hidden, onConfirmReservation, onAction, confirmingReservationId, reservationFeedback }: {
+function PlanningWeekView({ planning, hidden, onConfirmReservation, onCancelReservation, onAction, confirmingReservationId, reservationFeedback }: {
   planning: PlanningData;
   hidden: boolean;
   onConfirmReservation: (reservationId: string) => Promise<void>;
+  onCancelReservation: (reservationId: string) => Promise<void>;
   onAction: (preset: ActionPreset) => void;
   confirmingReservationId: string | null;
   reservationFeedback: Record<string, { ok: boolean; text: string }>;
@@ -1846,26 +2262,24 @@ function PlanningWeekView({ planning, hidden, onConfirmReservation, onAction, co
   const [openedEntryId, setOpenedEntryId] = useState<string | null>(null);
   const dragScroll = useHorizontalDrag();
   const [weekMonday, setWeekMonday] = useState(planning.weekMonday);
-  const [compactDays, setCompactDays] = useState(() => window.matchMedia('(max-width: 900px)').matches);
   const [dayPage, setDayPage] = useState(0);
+  const [focusDate, setFocusDate] = useState<string | null>(null);
   const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
   const dates = useMemo(() => buildWeekDates(`${weekMonday}..${weekMonday}`, weekMonday), [weekMonday]);
-  const dayPageCount = 3;
-  const visibleDateSlots = useMemo<Array<string | null>>(() => compactDays ? buildWeekPageSlots(dates, dayPage, 3) : dates, [compactDays, dates, dayPage]);
+  const { visibleDays, paginated } = useAdaptiveVisibleDays(dragScroll.ref, Boolean(focusDate));
+  const pageCount = Math.max(1, Math.ceil(7 / Math.max(1, visibleDays)));
+  const visibleDateSlots = useMemo<Array<string | null>>(
+    () => (focusDate ? [focusDate] : paginated ? buildWeekPageSlots(dates, dayPage, visibleDays) : dates),
+    [dates, dayPage, focusDate, paginated, visibleDays],
+  );
 
   useEffect(() => {
     setWeekMonday(planning.weekMonday);
   }, [planning.weekMonday]);
 
   useEffect(() => {
-    const media = window.matchMedia('(max-width: 900px)');
-    const update = () => setCompactDays(media.matches);
-    media.addEventListener('change', update);
-    return () => media.removeEventListener('change', update);
-  }, []);
-
-  useEffect(() => {
     setDayPage(0);
+    setFocusDate(null);
     setOpenedEntryId(null);
   }, [weekMonday, mode]);
   const range = useMemo(() => parseDateRange(planning.range), [planning.range]);
@@ -1943,6 +2357,14 @@ function PlanningWeekView({ planning, hidden, onConfirmReservation, onAction, co
     }
   }, [entries, openedEntryId]);
   useEffect(() => {
+    if (!focusDate) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFocusDate(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [focusDate]);
+  useEffect(() => {
     if (!openedEntryId) return undefined;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpenedEntryId(null);
@@ -1970,10 +2392,9 @@ const placementsByDate = useMemo(() => {
   const visibleLaneWeights = visibleDateSlots.map((date) => date ? laneCountsByDate.get(date) || 1 : 1);
   const visibleLaneUnits = visibleLaneWeights.reduce((sum, count) => sum + count, 0);
   const gridTemplate = `52px ${visibleLaneWeights.map((count) => `minmax(0, ${count}fr)`).join(' ')}`;
-  const canvasMinWidth = compactDays ? `calc(100% * ${visibleLaneUnits / visibleDateSlots.length})` : `${Math.ceil(1080 * visibleLaneUnits / visibleDateSlots.length)}px`;
-  const visibleEntries = compactDays ? entries.filter((entry) => visibleDateSlots.includes(entry.date)) : entries;
+  const visibleEntries = visibleDateSlots.length >= 7 ? entries : entries.filter((entry) => visibleDateSlots.includes(entry.date));
   const { startHour, endHour } = calendarHourBounds(visibleEntries);
-  const hourHeight = compactDays ? 76 : 64;
+  const hourHeight = focusDate ? 92 : visibleDays >= 6 ? 64 : visibleDays >= 4 ? 72 : 84;
   const calendarHeight = (endHour - startHour) * hourHeight;
   const hours = Array.from({ length: endHour - startHour + 1 }, (_, index) => startHour + index);
   const weekTitle = `${formatDate(`${dates[0]}T12:00:00+08:00`, { month: 'long', day: 'numeric' })}—${formatDate(`${dates[6]}T12:00:00+08:00`, { month: 'long', day: 'numeric' })}`;
@@ -1995,10 +2416,14 @@ const placementsByDate = useMemo(() => {
           <strong>{weekTitle}</strong>
           <button type="button" aria-label="下一周" disabled={!canNext} onClick={() => setWeekMonday((current) => addDateDays(current, 7))}>›</button>
         </div>
-        {compactDays && <div className="planning-day-page-nav" role="group" aria-label="切换本周日期页">
+        {focusDate ? <div className="planning-day-page-nav" role="group" aria-label="单日聚焦视图">
+          <button type="button" onClick={() => setFocusDate(null)}>‹ 返回整周</button>
+          <strong>{formatDate(`${focusDate}T12:00:00+08:00`, { month: 'long', day: 'numeric', weekday: 'long' })} · 单日视图</strong>
+          <span aria-hidden="true" />
+        </div> : paginated && <div className="planning-day-page-nav" role="group" aria-label="切换本页日期">
           <button type="button" disabled={dayPage === 0} onClick={() => setDayPage((current) => Math.max(0, current - 1))}>‹ 上一页</button>
-          <strong>第 {dayPage + 1}/{dayPageCount} 页 · 每页 3 天</strong>
-          <button type="button" disabled={dayPage === dayPageCount - 1} onClick={() => setDayPage((current) => Math.min(dayPageCount - 1, current + 1))}>下一页 ›</button>
+          <strong>第 {dayPage + 1}/{pageCount} 页 · 每页 {visibleDays} 天</strong>
+          <button type="button" disabled={dayPage >= pageCount - 1} onClick={() => setDayPage((current) => Math.min(pageCount - 1, current + 1))}>下一页 ›</button>
         </div>}
       </div>
     </div>
@@ -2010,13 +2435,13 @@ const placementsByDate = useMemo(() => {
         <span><i className="template" />正式固定</span><span><i className="confirmed" />已确认</span><span><i className="pending" />待定</span><span><i className="unconfirmed" />未确认</span>
       </>}
     </div>
-    {entries.length ? <div className="planning-week-scroll draggable-week-scroll" role="region" tabIndex={0} aria-label="筹备周视图，可使用方向键或触控横向浏览" {...dragScroll}>
-      <div className={compactDays ? 'planning-week-canvas compact-page' : 'planning-week-canvas'} style={{ minWidth: canvasMinWidth }}>
+    {entries.length ? <div className="planning-week-scroll draggable-week-scroll" role="region" tabIndex={0} aria-label="筹备周视图，点击日期标题聚焦到单日" {...dragScroll}>
+      <div className="planning-week-canvas" style={{ minWidth: 0 }}>
         <div className="planning-week-header" style={{ gridTemplateColumns: gridTemplate }}>
           <div className="planning-week-corner">时间</div>
-          {visibleDateSlots.map((date, slotIndex) => date ? <div className={date === planning.localDate ? 'planning-week-day-header today' : 'planning-week-day-header'} key={date}>
+          {visibleDateSlots.map((date, slotIndex) => date ? <button type="button" key={date} className={date === planning.localDate ? 'planning-week-day-header today' : 'planning-week-day-header'} onClick={() => setFocusDate(date)} aria-label={`聚焦到 ${formatDate(`${date}T12:00:00+08:00`, { month: 'long', day: 'numeric', weekday: 'long' })} 的单日视图`}>
             <span>{weekdays[dates.indexOf(date)]}</span><strong>{Number(date.slice(8, 10))}</strong><small>{byDate.get(date)?.length || 0} 项</small>
-          </div> : <div className="planning-week-day-header empty-slot" key={`empty-${slotIndex}`} aria-hidden="true" />)}
+          </button> : <div className="planning-week-day-header empty-slot" key={`empty-${slotIndex}`} aria-hidden="true" />)}
         </div>
         <div className="planning-week-body" style={{ gridTemplateColumns: gridTemplate }} onPointerDown={(event) => { if (!(event.target as HTMLElement).closest('.planning-week-block')) setOpenedEntryId(null); }}>
           <div className="planning-week-axis" style={{ height: calendarHeight }}>{hours.map((hour) => <span key={hour} style={{ top: (hour - startHour) * hourHeight }}>{String(hour).padStart(2, '0')}:00</span>)}</div>
@@ -2077,9 +2502,10 @@ const placementsByDate = useMemo(() => {
                       </> : <>
                         <button type="button" className="secondary" onClick={() => onAction({ operation: 'course_move', student: item.student, fromDate: item.date, fromTime: item.start_time, toDate: item.date, toTime: item.start_time, duration: item.duration })}>调整时间</button>
                         <button type="button" className="danger" onClick={() => onAction({ operation: 'course_cancel', student: item.student, date: item.date, time: item.start_time })}>本次不上</button>
+                        <button type="button" className="quiet-danger" disabled={anyReservationBusy} onClick={() => { const pendingCancel = onCancelReservation(item.reservationId!); if (pendingCancel && typeof pendingCancel.then === 'function') void pendingCancel.finally(() => setOpenedEntryId(null)); }}>取消预留</button>
                       </>}
                     </div>
-                    {(item.blockerText || feedback) && <small className={feedback?.ok ? 'ok' : 'error'}>{feedback?.text || item.blockerText}</small>}
+                    {(item.blockerText || feedback) && <InlineResult ok={Boolean(feedback?.ok)} text={feedback?.text || item.blockerText || ''} />}
                   </div>}
                 </article>;
               })}
@@ -2098,11 +2524,13 @@ function TemplateIssue({ label, count, tone, details }: { label: string; count: 
 
 const WEEK_LABEL: Record<string, string> = { mon: '周一', tue: '周二', wed: '周三', thu: '周四', fri: '周五', sat: '周六', sun: '周日' };
 
-function AffairCard({ item, onInspect, onPrepare, onRetry, retryingId, feedback }: {
+function AffairCard({ item, onInspect, onPrepare, onQuick, onRetry, onRetryPrev, retryingId, feedback }: {
   item: TimelineItem;
   onInspect: InspectHandler;
   onPrepare: (preset: ActionPreset) => void;
+  onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
+  onRetryPrev?: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
   feedback?: AffairFeedback;
 }) {
@@ -2129,7 +2557,7 @@ function AffairCard({ item, onInspect, onPrepare, onRetry, retryingId, feedback 
         </>}
         {kind === 'deadline' && item.deadline_at && <>
           <strong>{formatDate(item.deadline_at, { month: 'numeric', day: 'numeric' })}</strong>
-          <span>截止{daysLeft != null && !closed ? ` · 剩 ${daysLeft} 天` : ''}</span>
+          <span>截止{daysLeft != null && !closed ? ` · ${daysLeft >= 0 ? `剩 ${daysLeft} 天` : `已过 ${-daysLeft} 天`}` : ''}</span>
         </>}
         {kind === 'fuzzy' && <>
           <strong className="fuzzy-mark">~</strong>
@@ -2150,11 +2578,12 @@ function AffairCard({ item, onInspect, onPrepare, onRetry, retryingId, feedback 
         {kind === 'retry' && item.retry?.weekdays?.length ? <span className="affair-candidates">
           {(item.retry.weekdays as string[]).map((day) => <i key={day}>{WEEK_LABEL[day] || day}</i>)}
         </span> : null}
-        {feedback ? <small className={feedback.ok ? 'affair-feedback ok' : 'affair-feedback error'}>{feedback.text}</small> : null}
+        {feedback ? <InlineResult ok={feedback.ok} text={feedback.text} /> : null}
+        {feedback?.undo && onRetryPrev ? <button type="button" className="affair-do secondary" disabled={Boolean(retryingId)} onClick={() => void onRetryPrev(item)}>撤销推进</button> : null}
       </div>
       <div className="affair-card-actions">
         {!closed && <>
-          <button type="button" className="affair-do primary" onClick={() => onPrepare({ operation: 'affair_complete', id: item.id, expectedVersion: item.version })}>完成</button>
+          <button type="button" className="affair-do primary" disabled={Boolean(retryingId) || feedback?.ok} onClick={() => onQuick?.('affairComplete', item)}>{feedback?.ok ? '已完成' : '完成'}</button>
           {item.retry && onRetry
             ? <button type="button" className="affair-do secondary" disabled={Boolean(retryingId) || Boolean(feedback?.ok)} aria-busy={retrying} onClick={() => void onRetry(item)}>{retrying ? '处理中…' : feedback?.buttonLabel || '没约上'}</button>
             : <button type="button" className="affair-do quiet" onClick={() => onPrepare({ operation: 'affair_cancel', id: item.id, expectedVersion: item.version })}>取消</button>}
@@ -2164,15 +2593,47 @@ function AffairCard({ item, onInspect, onPrepare, onRetry, retryingId, feedback 
   );
 }
 
-function AffairsView({ pending, affairs, onPrepare, onInspect, onRetry, retryingId, feedback }: {
-  pending: TimelineItem[];
-  affairs: TimelineItem[];
+function AffairsView({ onPrepare, onQuick, onInspect, onRetry, onRetryPrev, retryingId, feedback, refreshKey, observedAt, onOpenDay, localDate }: {
   onPrepare: (preset: ActionPreset) => void;
+  onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
   onInspect: InspectHandler;
   onRetry: (item: TimelineItem) => Promise<void>;
+  onRetryPrev?: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
   feedback: Record<string, AffairFeedback>;
+  refreshKey: number;
+  observedAt: string;
+  onOpenDay: (date: string, items: TimelineItem[], trigger?: HTMLElement | null) => void;
+  localDate?: string;
 }) {
+  const [affairsFilter, setAffairsFilter] = useState<'pending' | 'scheduled' | 'closed'>('pending');
+  const [affairsView, setAffairsView] = useState<'list' | 'calendar'>('list');
+  // 固定本月视图（含已完成/已取消留痕），与总览的时间范围解耦：这个月做了什么一眼可见。
+  const [state, setState] = useState<{ affairs: TimelineItem[]; pending: TimelineItem[]; month: string } | null>(() => readWorkbenchCache<{ affairs: TimelineItem[]; pending: TimelineItem[]; month: string }>('affairs-month'));
+  const [error, setError] = useState('');
+  const load = useCallback((fresh: boolean) => {
+    void api<any>('api/affairs-month' + (fresh ? '?fresh=1' : '')).then((res) => {
+      if (!res || !Array.isArray(res.affairs) || !Array.isArray(res.pending)) return;
+      const next = {
+        affairs: (res.affairs as TimelineItem[]).map((item) => ({ ...item, domain: 'affair' as const })),
+        pending: (res.pending as TimelineItem[]).map((item) => ({ ...item, domain: 'affair' as const })),
+        month: String(res.month || ''),
+      };
+      setState(next);
+      writeWorkbenchCache('affairs-month', next);
+      setError('');
+    }).catch(() => {});
+  }, []);
+  useEffect(() => { void load(!state); }, [load]);
+  useEffect(() => {
+    if (refreshKey > 0) void load(true);
+  }, [refreshKey]);
+  useEffect(() => {
+    if (observedAt && state) void load(false);
+  }, [observedAt, load]);
+
+  const pending = state?.pending ?? [];
+  const affairs = state?.affairs ?? [];
   const closedStatuses = new Set(['completed', 'cancelled', '已完成', '已取消']);
   const scheduledAffairs = affairs
     .filter((item) => !closedStatuses.has(item.status))
@@ -2180,31 +2641,59 @@ function AffairsView({ pending, affairs, onPrepare, onInspect, onRetry, retrying
   const closedAffairs = affairs
     .filter((item) => closedStatuses.has(item.status))
     .sort((a, b) => String(itemDate(b) || '').localeCompare(String(itemDate(a) || '')));
+  const doneCount = closedAffairs.filter((item) => !['cancelled', '已取消'].includes(item.status)).length;
+  const monthRange = state?.month ? `${state.month}-01..${state.month}-01` : '';
+  const lists = { pending, scheduled: scheduledAffairs, closed: closedAffairs };
+  const visible = lists[affairsFilter];
+  const emptyCopy = {
+    pending: { title: '没有待处理事务', text: '当前队列没有积压。' },
+    scheduled: { title: '暂无已安排事务', text: '本月没有进行中的事务。' },
+    closed: { title: '暂无完成记录', text: '结束后的事务会归档到这里。' },
+  }[affairsFilter];
+
+  function handleDayOpen(date: string, trigger?: HTMLElement | null) {
+    const dayItems = affairs.filter((item) => itemDateKey(item) === date);
+    onOpenDay(date, dayItems, trigger);
+  }
 
   return (
     <div className="view-stack">
-      <PageTitle eyebrow="事务" title="办事队列" description="待确认、重试和当前时间范围内的事务集中展示。" />
-      <section className="content-grid affairs-grid">
-        <div className="panel wide">
-          <PanelHeading title="待处理" meta={`${pending.length} 项`} />
-          {pending.length ? pending.map((item) => <AffairCard key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onRetry={onRetry} retryingId={retryingId} feedback={feedback[item.id]} />) : <Empty title="没有待处理事务" text="当前队列没有积压。" />}
+      <PageTitle eyebrow={`事务 · 本月 ${state?.month?.slice(5) || ''}`} title="办事队列" description={`这个月办了 ${doneCount} 件、取消 ${closedAffairs.length - doneCount} 件，进行中 ${scheduledAffairs.length} 件。点日历上的任何一天，看那天的安排。`} />
+      {error && <Notice tone="error" title="事务数据读取失败" text={error} />}
+      {!state && <LoadingState />}
+      {state && <>
+        <div className="affairs-toolbar">
+          <WorkbenchNav
+            label="事务状态"
+            value={affairsFilter}
+            onChange={(next) => setAffairsFilter(next as typeof affairsFilter)}
+            items={[
+              { id: 'pending', label: '待处理', count: pending.length },
+              { id: 'scheduled', label: '已安排', count: scheduledAffairs.length },
+              { id: 'closed', label: '已完成·已取消', count: closedAffairs.length },
+            ]}
+          />
+          <WorkbenchNav
+            label="视图切换"
+            value={affairsView}
+            onChange={(next) => setAffairsView(next as typeof affairsView)}
+            items={[{ id: 'list', label: '列表' }, { id: 'calendar', label: '日历' }]}
+          />
         </div>
-        <div className="panel affair-record-panel">
-          <section className="affair-record-group scheduled">
-            <PanelHeading title="已安排" meta={`${scheduledAffairs.length} 项`} />
-            {scheduledAffairs.length ? scheduledAffairs.map((item) => <AffairCard key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onRetry={onRetry} retryingId={retryingId} feedback={feedback[item.id]} />) : <Empty title="暂无已安排事务" text="当前时间范围内没有进行中的事务。" compact />}
-          </section>
-          <section className="affair-record-group completed">
-            <PanelHeading title="已完成／已取消" meta={`${closedAffairs.length} 项`} />
-            {closedAffairs.length ? closedAffairs.map((item) => <AffairCard key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onRetry={onRetry} retryingId={retryingId} feedback={feedback[item.id]} />) : <Empty title="暂无完成记录" text="结束后的事务会归档到这里。" compact />}
-          </section>
-        </div>
-      </section>
+
+        {affairsView === 'calendar'
+          ? <MonthCalendar items={affairs} range={monthRange} localDate={localDate ?? state.month + '-01'} onOpenDay={handleDayOpen} />
+          : (
+            <div>
+              {visible.length ? visible.map((item) => <AffairCard key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onRetry={onRetry} onRetryPrev={onRetryPrev} retryingId={retryingId} feedback={feedback[item.id]} />) : <Empty title={emptyCopy.title} text={emptyCopy.text} />}
+            </div>
+          )}
+      </>}
     </div>
   );
 }
 
-function ActionsView({ pending, students, preset, aiDraft, preview, busy, onPreview, onAiPreview, onCommit, onClear, onClose }: {
+function ActionsView({ pending, students, preset, aiDraft, preview, busy, onPreview, onAiPreview, onCommit, onCommitBatch, onClear, onClose }: {
   pending: TimelineItem[];
   students: Student[];
   preset: ActionPreset | null;
@@ -2214,6 +2703,7 @@ function ActionsView({ pending, students, preset, aiDraft, preview, busy, onPrev
   onPreview: (input: Record<string, unknown>) => Promise<void>;
   onAiPreview: (preview: PreviewResponse) => void;
   onCommit: () => Promise<void>;
+  onCommitBatch: () => Promise<void>;
   onClear: () => void;
   onClose: () => void;
 }) {
@@ -2255,7 +2745,7 @@ function ActionsView({ pending, students, preset, aiDraft, preview, busy, onPrev
 
   return (
     <div className={preset ? 'view-stack action-stack preset-open' : 'view-stack action-stack'}>
-      <AiActionWorkspace initialDraft={aiDraft} preview={preview} busy={busy} onPreview={onAiPreview} onCommit={onCommit} onClear={onClear} onClose={onClose} />
+      <AiActionWorkspace initialDraft={aiDraft} preview={preview} busy={busy} onPreview={onAiPreview} onCommit={onCommit} onCommitBatch={onCommitBatch} onClear={onClear} onClose={onClose} />
       <details className="manual-operations" open={Boolean(preset)}>
         <summary><strong>精确表单</strong><span>需要手动指定字段时再打开</span></summary>
         <section className="action-layout">
@@ -2279,8 +2769,10 @@ function ActionsView({ pending, students, preset, aiDraft, preview, busy, onPrev
               <option value="course_day_complete">完成当日课程</option>
               <option value="course_plan">多项调课计划</option>
               <option value="affair_create">新建事务</option>
+              <option value="affair_update">修改事务</option>
               <option value="affair_complete">完成事务</option>
               <option value="affair_retry_next">推进重试日期</option>
+              <option value="affair_retry_prev">恢复上一候选日</option>
               <option value="affair_cancel">取消事务</option>
               <option value="calendar_sync">同步飞书日历</option>
             </select>
@@ -2496,6 +2988,52 @@ function ActionsView({ pending, students, preset, aiDraft, preview, busy, onPrev
                 <option value="urgent">紧急</option>
               </select>
             </label>
+            <label className="exception-toggle full"><input name="followUp" type="checkbox" value="daily" /><span><strong>办成前每日跟进</strong><small>每天按提醒时间推送，直到约上或完成；约上（已排期）后自动静默。</small></span></label>
+          </>}
+
+          {kind === 'affair_update' && <>
+            <label className="field full">
+              <span>事务</span>
+              <select name="id" required defaultValue={preset?.id || ''}>
+                <option value="" disabled>选择待处理事务</option>
+                {pending.map((item) => <option key={item.id} value={item.id}>{item.title} · {item.id}</option>)}
+              </select>
+            </label>
+            <Field name="title" label="新标题（可选）" defaultValue={preset?.title} />
+            <Field name="startDate" label="新开始日期（可选）" type="date" />
+            <Field name="startTime" label="新开始时间（可选）" type="time" />
+            <label className="field">
+              <span>优先级（可选）</span>
+              <select name="priority" defaultValue="">
+                <option value="">不变</option>
+                <option value="low">低</option>
+                <option value="normal">普通</option>
+                <option value="high">高</option>
+                <option value="urgent">紧急</option>
+              </select>
+            </label>
+            <Field name="note" label="新备注（可选）" />
+            <label className="field full">
+              <span>每日跟进</span>
+              <select name="followUp" defaultValue="">
+                <option value="">不变</option>
+                <option value="daily">办成前每日跟进</option>
+                <option value="none">停止跟进</option>
+              </select>
+            </label>
+            <div className="field-note full">修改会校验与其他事务和课程的冲突；至少填写一个要改的字段。retry 事务的候选日请用“推进重试日期”，不要在这里改时间。</div>
+          </>}
+
+          {kind === 'affair_retry_prev' && <>
+            <label className="field full">
+              <span>事务</span>
+              <select name="id" required defaultValue={preset?.id || ''}>
+                <option value="" disabled>选择待处理事务</option>
+                {pending.map((item) => <option key={item.id} value={item.id}>{item.title} · {item.id}</option>)}
+              </select>
+            </label>
+            <Field name="expectedVersion" label="当前版本（可选）" type="number" placeholder="用于并发保护" defaultValue={preset?.expectedVersion} />
+            <div className="field-note full">撤销一次“没约上”推进，恢复上一个候选日；只对预约重试型事务有效。</div>
           </>}
 
           {['affair_complete', 'affair_retry_next', 'affair_cancel'].includes(kind) && <>
@@ -2564,16 +3102,51 @@ const FIELD_LABEL: Record<string, string> = {
   candidateDates: '候选日期', weekdays: '星期', startWeek: '起始周', remindAt: '提醒时刻', reservationId: '预留', expectedVersion: '版本',
 };
 
-function PreviewSummary({ preview, busy, onCommit, onClose }: {
+function PreviewSummary({ preview, busy, onCommit, onCommitBatch, onClose }: {
   preview: PreviewResponse;
   busy: boolean;
   onCommit: () => Promise<void>;
+  onCommitBatch?: () => Promise<void>;
   onClose: () => void;
 }) {
   const operation = preview.operation || '';
   const input = (preview.input as Record<string, unknown> | undefined) || {};
   const rows = Object.entries(input).filter(([key, value]) => value != null && value !== '' && !key.startsWith('_'));
   const affected = (preview.result as any)?.affected_dates as string[] | undefined;
+  const batchItems = preview.batchItems ?? [];
+  if (batchItems.length) {
+    return (
+      <div className="preview-body">
+        <div className={preview.committed ? (preview.ok ? 'preview-status pass' : 'preview-status fail') : 'preview-status pass'}>
+          <i />
+          <div>
+            <strong>{preview.committed ? (preview.ok ? '批量执行完成' : '批量执行有失败') : `批量方案 · ${batchItems.length} 项`}</strong>
+            <span>{preview.summary || preview.message}</span>
+          </div>
+        </div>
+        <div className="batch-list">
+          {batchItems.map((item, index) => {
+            const flag = preview.committed
+              ? { text: item.resultOk ? '已执行' : '失败', cls: item.resultOk ? 'ok' : 'error' }
+              : { text: item.canCommit ? '可执行' : '未通过', cls: item.canCommit ? 'ok' : 'muted' };
+            return <div key={item.token} className="batch-item">
+              <span className="batch-index">{index + 1}</span>
+              <div className="batch-main">
+                <strong>{OPERATION_LABEL[item.operation] || item.operation}</strong>
+                <span>{item.summary}</span>
+                {item.message && <small>{item.message}</small>}
+              </div>
+              <span className={`batch-flag ${flag.cls}`}>{flag.text}</span>
+            </div>;
+          })}
+        </div>
+        <div className="action-outcome-actions">
+          {!preview.committed && <button type="button" className="primary-button" disabled={busy || !batchItems.some((item) => item.canCommit)} onClick={() => void (onCommitBatch?.() ?? Promise.resolve())}>{busy ? '正在提交…' : `全部执行（${batchItems.filter((item) => item.canCommit).length} 项）`}</button>}
+          {preview.committed && <button type="button" className="primary-button" onClick={onClose}>完成并返回</button>}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="preview-body">
       <div className={preview.canCommit ? 'preview-status pass' : preview.ok ? 'preview-status neutral' : 'preview-status fail'}>
@@ -2596,12 +3169,13 @@ function PreviewSummary({ preview, busy, onCommit, onClose }: {
   );
 }
 
-function AiActionWorkspace({ initialDraft, preview, busy, onPreview, onCommit, onClear, onClose }: {
+function AiActionWorkspace({ initialDraft, preview, busy, onPreview, onCommit, onCommitBatch, onClear, onClose }: {
   initialDraft: { text: string; nonce: number };
   preview: PreviewResponse | null;
   busy: boolean;
   onPreview: (preview: PreviewResponse) => void;
   onCommit: () => Promise<void>;
+  onCommitBatch: () => Promise<void>;
   onClear: () => void;
   onClose: () => void;
 }) {
@@ -2616,6 +3190,7 @@ function AiActionWorkspace({ initialDraft, preview, busy, onPreview, onCommit, o
   const [draft, setDraft] = useState('');
   const [thinking, setThinking] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [options, setOptions] = useState<string[]>([]);
   const aiRequestGateRef = useRef(createRequestGate());
 
   useEffect(() => () => aiRequestGateRef.current.invalidate(), []);
@@ -2633,16 +3208,18 @@ function AiActionWorkspace({ initialDraft, preview, busy, onPreview, onCommit, o
     setMessages([greeting]);
     setDraft('');
     setAiError('');
+    setOptions([]);
     onClear();
   }
 
-  async function sendMessage() {
-    const message = draft.trim();
+  async function sendMessage(explicit?: string) {
+    const message = (explicit ?? draft).trim();
     if (!message || thinking) return;
     const requestId = aiRequestGateRef.current.begin();
     const history = messages.slice(-10);
     setMessages((current) => [...current, { role: 'user', text: message }]);
     setDraft('');
+    setOptions([]);
     setThinking(true);
     setAiError('');
     onClear();
@@ -2654,8 +3231,17 @@ function AiActionWorkspace({ initialDraft, preview, busy, onPreview, onCommit, o
       });
       if (!aiRequestGateRef.current.isCurrent(requestId)) return;
       if (!data.ok) throw new Error(data.error || 'AI 没有生成方案');
+      setOptions(data.status === 'need_clarification' ? (data.options ?? []) : []);
       setMessages((current) => [...current, { role: 'assistant', text: data.reply || '方案已经生成，请检查右侧预演。' }]);
-      if (data.status === 'ready' && data.preview) {
+      if (data.status === 'ready' && data.batch && data.previews?.length) {
+        onPreview({
+          ok: true,
+          batch: true,
+          summary: data.reply,
+          message: data.reply,
+          batchItems: data.previews.map((item) => ({ operation: item.operation, token: item.token, summary: item.summary, canCommit: item.canCommit, message: item.message })),
+        });
+      } else if (data.status === 'ready' && data.preview) {
         onPreview({
           ok: true,
           token: data.preview.token,
@@ -2694,6 +3280,9 @@ function AiActionWorkspace({ initialDraft, preview, busy, onPreview, onCommit, o
             {thinking && <div className="ai-bubble assistant thinking">正在读取课表、预留、可用时间和通勤信息…</div>}
           </div>
           {aiError && <Notice tone="error" title="没有生成方案" text={aiError} />}
+          {options.length > 0 && <div className="ai-option-row" role="group" aria-label="快捷回答">
+            {options.map((option) => <button key={option} type="button" onClick={() => { void sendMessage(option); }}>{option}</button>)}
+          </div>}
           <div className="ai-composer workspace-composer">
             <textarea
               value={draft}
@@ -2714,25 +3303,29 @@ function AiActionWorkspace({ initialDraft, preview, busy, onPreview, onCommit, o
         <div className="ai-result-column">
           <PanelHeading title="AI 预演" meta={preview?.token ? `令牌 ${preview.token.slice(0, 8)}…` : '等待指令'} />
           {!preview && <Empty title="等你说一句" text="我会自动补齐默认时长、换算相对日期，并把缺失信息一次问清。" />}
-          {preview && <PreviewSummary preview={preview} busy={busy} onCommit={onCommit} onClose={onClose} />}
+          {preview && <PreviewSummary preview={preview} busy={busy} onCommit={onCommit} onCommitBatch={onCommitBatch} onClose={onClose} />}
         </div>
       </div>
     </section>
   );
 }
 
-function ContextDrawerContent({ view, dashboard, onPrepare, onRetry, retryingId, affairFeedback, onSync }: {
+function ContextDrawerContent({ view, dashboard, onPrepare, onQuick, onRetry, onRetryPrev, retryingId, affairFeedback, onSync }: {
   view: ContextView;
   dashboard: Dashboard;
   onPrepare: (preset: ActionPreset) => void;
+  onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
+  onRetryPrev?: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
   affairFeedback: Record<string, AffairFeedback>;
   onSync: () => void;
 }) {
   if (view.kind === 'system') return <SystemView dashboard={dashboard} onSync={onSync} embedded />;
   const items = view.kind === 'day'
-    ? dashboard.items.filter((item) => itemDateKey(item) === view.date).sort((a, b) => String(itemDate(a) || '').localeCompare(String(itemDate(b) || '')))
+    ? (view.items
+      ? [...view.items].sort((a, b) => String(itemDate(a) || '').localeCompare(String(itemDate(b) || '')))
+      : dashboard.items.filter((item) => itemDateKey(item) === view.date).sort((a, b) => String(itemDate(a) || '').localeCompare(String(itemDate(b) || ''))))
     : [view.item];
   if (!items.length) return <Empty title="当天没有安排" text="当前时间范围内没有课程或事务。" />;
   return <div className="context-item-list">
@@ -2740,17 +3333,21 @@ function ContextDrawerContent({ view, dashboard, onPrepare, onRetry, retryingId,
       key={item.id}
       item={item}
       onPrepare={onPrepare}
+      onQuick={onQuick}
       onRetry={onRetry}
+      onRetryPrev={onRetryPrev}
       retryingId={retryingId}
       feedback={item.domain === 'affair' ? affairFeedback[item.id] : undefined}
     />)}
   </div>;
 }
 
-function ContextItemCard({ item, onPrepare, onRetry, retryingId, feedback }: {
+function ContextItemCard({ item, onPrepare, onQuick, onRetry, onRetryPrev, retryingId, feedback }: {
   item: TimelineItem;
   onPrepare: (preset: ActionPreset) => void;
+  onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
+  onRetryPrev?: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
   feedback?: AffairFeedback;
 }) {
@@ -2763,13 +3360,14 @@ function ContextItemCard({ item, onPrepare, onRetry, retryingId, feedback }: {
     </header>
     <h3>{item.title}</h3>
     <p>{item.domain === 'course' ? `${item.duration || '—'} 分钟 · ${item.note || '常规课程'}` : item.note || item.window_label || '暂无补充说明'}</p>
-    {feedback && <small className={feedback.ok ? 'context-feedback ok' : 'context-feedback error'}>{feedback.text}</small>}
+    {feedback && <InlineResult ok={feedback.ok} text={feedback.text} />}
+    {feedback?.undo && onRetryPrev ? <button type="button" className="row-action-button" disabled={Boolean(retryingId)} onClick={() => void onRetryPrev(item)}>撤销推进</button> : null}
     {!finished && <div className="context-item-actions">
       {item.domain === 'course' ? <>
         <button type="button" className="primary-button" onClick={() => onPrepare({ operation: 'course_move', student: item.title, fromDate: item.start_at?.slice(0, 10), fromTime: item.start_at?.slice(11, 16), toDate: item.start_at?.slice(0, 10), toTime: item.start_at?.slice(11, 16), duration: item.duration })}>调整时间…</button>
-        <button type="button" className="row-action-button quiet-danger" onClick={() => onPrepare({ operation: 'course_cancel', student: item.title, date: item.start_at?.slice(0, 10), time: item.start_at?.slice(11, 16) })}>本次不上…</button>
+        <button type="button" className="row-action-button quiet-danger" disabled={Boolean(retryingId)} onClick={() => onQuick?.('courseCancel', item)}>本次不上</button>
       </> : <>
-        <button type="button" className="primary-button" onClick={() => onPrepare({ operation: 'affair_complete', id: item.id, expectedVersion: item.version })}>完成…</button>
+        <button type="button" className="primary-button" disabled={Boolean(retryingId) || feedback?.ok} onClick={() => onQuick?.('affairComplete', item)}>{feedback?.ok ? '已完成' : '完成'}</button>
         {item.retry
           ? <button type="button" className={feedback?.ok ? 'row-action-button quick-success' : 'row-action-button'} disabled={Boolean(retryingId) || Boolean(feedback?.ok)} onClick={() => void onRetry(item)}>{retryingId === item.id ? '处理中…' : feedback?.buttonLabel || '没约上'}</button>
           : <button type="button" className="row-action-button quiet-danger" onClick={() => onPrepare({ operation: 'affair_cancel', id: item.id, expectedVersion: item.version })}>取消…</button>}
@@ -2882,28 +3480,21 @@ function SystemView({ dashboard, onSync, embedded = false }: { dashboard: Dashbo
   );
 }
 
-function NextCourseBanner({ course, advice, onOpen, onPrepare }: { course: TimelineItem | null; advice: Dashboard['commuteAdvice']; onOpen: (trigger: HTMLElement) => void; onPrepare: (preset: ActionPreset) => void }) {
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const closeRef = useCloseOnOutside<HTMLElement>(actionsOpen, () => setActionsOpen(false));
+function NextCourseBanner({ course, advice, onOpen, onPrepare, onQuick }: { course: TimelineItem | null; advice: Dashboard['commuteAdvice']; onOpen: (trigger: HTMLElement) => void; onPrepare: (preset: ActionPreset) => void; onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void }) {
   if (!course) {
     return <section className="next-course-banner empty-next"><div><p className="eyebrow">下一节课</p><h3>未来范围内没有课程</h3></div></section>;
   }
   return (
     <section
-      ref={closeRef}
-      className={`next-course-banner next-course-open contextual-action-host ${itemStateClass(course)}${isTemporaryItem(course) ? ' temporary' : ''} actionable${actionsOpen ? ' action-open' : ''}`}
+      className={`next-course-banner next-course-open contextual-action-host ${itemStateClass(course)}${isTemporaryItem(course) ? ' temporary' : ''} actionable`}
       role="button"
       tabIndex={0}
-      aria-expanded={actionsOpen}
       onClick={(event) => {
         if ((event.target as HTMLElement).closest('button')) return;
-        if (window.matchMedia('(hover: none)').matches) setActionsOpen((current) => !current);
-        else onOpen(event.currentTarget);
+        onOpen(event.currentTarget);
       }}
       onKeyDown={(event) => {
-        if (event.key === 'Enter') { event.preventDefault(); onOpen(event.currentTarget); }
-        else if (event.key === ' ') { event.preventDefault(); setActionsOpen((current) => !current); }
-        else if (event.key === 'Escape') setActionsOpen(false);
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(event.currentTarget); }
       }}
     >
       <div className="next-course-time">
@@ -2925,7 +3516,7 @@ function NextCourseBanner({ course, advice, onOpen, onPrepare }: { course: Timel
         </>}
       </div>
       <span className="next-course-cue">查看详情 →</span>
-      <div className="next-course-inline-action"><ItemActionButtons item={course} onPrepare={(preset) => { setActionsOpen(false); onPrepare(preset); }} /></div>
+      <div className="next-course-inline-action"><ItemActionButtons item={course} onQuick={onQuick} /></div>
     </section>
   );
 }
@@ -2940,39 +3531,59 @@ function ActionOutcomeActions({ preview, onClose }: {
   </div>;
 }
 
+function WorkbenchNav({ label, items, value, onChange, busy }: {
+  label: string;
+  items: Array<{ id: string; label: string; count?: number }>;
+  value: string;
+  onChange: (id: string) => void;
+  busy?: boolean;
+}) {
+  return <nav className="workbench-nav" aria-label={label}>
+    {items.map((item) => (
+      <button
+        type="button"
+        key={item.id}
+        className={value === item.id ? 'selected' : ''}
+        aria-label={`${item.label}${item.count ? `，${item.count} 项` : ''}`}
+        aria-pressed={value === item.id}
+        disabled={busy}
+        onClick={() => onChange(item.id)}
+      ><span>{item.label}</span>{item.count ? <strong>{item.count}</strong> : null}</button>
+    ))}
+  </nav>;
+}
+
+function InlineResult({ ok, text }: { ok: boolean; text: string }) {
+  return <small className={`inline-result ${ok ? 'ok' : 'error'}`}>{text}</small>;
+}
+
 function Metric({ label, value, hint, tone }: { label: string; value: string | number; hint: string; tone: string }) {
   return <div className={`metric-card ${tone}`}><span>{label}</span><strong>{value}</strong><small>{hint}</small></div>;
 }
 
-function TimelineRow({ item, onInspect, onPrepare, onRetry, retryingId, feedback }: {
+function TimelineRow({ item, onInspect, onPrepare, onQuick, onRetry, retryingId, feedback }: {
   item: TimelineItem;
   onInspect?: InspectHandler;
   onPrepare?: (preset: ActionPreset) => void;
+  onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
   onRetry?: (item: TimelineItem) => Promise<void>;
   retryingId?: string | null;
   feedback?: AffairFeedback;
 }) {
-  const [actionsOpen, setActionsOpen] = useState(false);
   const finished = ['completed', 'cancelled', '已完成', '已取消', '已调课'].includes(item.status);
-  const closeRef = useCloseOnOutside<HTMLDivElement>(actionsOpen, () => setActionsOpen(false));
   const actionable = Boolean(onPrepare) && !finished;
   return (
     <div
-      ref={closeRef}
-      className={`${onInspect ? 'timeline-row inspectable' : 'timeline-row'} contextual-action-host ${itemStateClass(item)}${isTemporaryItem(item) ? ' temporary' : ''}${actionable ? ' actionable' : ''}${actionsOpen ? ' action-open' : ''}`}
+      className={`${onInspect ? 'timeline-row inspectable' : 'timeline-row'} contextual-action-host ${itemStateClass(item)}${isTemporaryItem(item) ? ' temporary' : ''}${actionable ? ' actionable' : ''}`}
       data-item-id={item.id}
       role={onInspect ? 'button' : undefined}
       tabIndex={onInspect ? 0 : undefined}
-      aria-expanded={actionable ? actionsOpen : undefined}
       onClick={(event) => {
         if ((event.target as HTMLElement).closest('button')) return;
-        if (actionable && window.matchMedia('(hover: none)').matches) setActionsOpen((current) => !current);
-        else onInspect?.(item, event.currentTarget);
+        onInspect?.(item, event.currentTarget);
       }}
       onKeyDown={(event) => {
-        if (event.key === 'Enter' && onInspect) { event.preventDefault(); onInspect(item, event.currentTarget); }
-        else if (event.key === ' ' && actionable) { event.preventDefault(); setActionsOpen((current) => !current); }
-        else if (event.key === 'Escape') setActionsOpen(false);
+        if ((event.key === 'Enter' || event.key === ' ') && onInspect) { event.preventDefault(); onInspect(item, event.currentTarget); }
       }}
     >
       <div className={`domain-dot ${item.domain}`} />
@@ -2980,42 +3591,36 @@ function TimelineRow({ item, onInspect, onPrepare, onRetry, retryingId, feedback
       <div className="row-main">
         <strong>{item.title}</strong>
         <span>{item.domain === 'course' ? `${item.duration || '—'} 分钟` : item.note || item.window_label || '事务'}</span>
-        {feedback && <small className={feedback.ok ? 'course-feedback ok' : 'course-feedback error'}>{feedback.text}</small>}
+        {feedback && <InlineResult ok={feedback.ok} text={feedback.text} />}
       </div>
       <div className="timeline-actions"><Status value={item.status} /></div>
-      {actionable && onPrepare && <div className="row-inline-action"><ItemActionButtons item={item} onPrepare={(preset) => { setActionsOpen(false); onPrepare(preset); }} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>}
+      {actionable && (onPrepare || onQuick) && <div className="row-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>}
     </div>
   );
 }
 
-function AffairRow({ item, onInspect, onPrepare, onRetry, retryingId, feedback }: {
+function AffairRow({ item, onInspect, onPrepare, onQuick, onRetry, retryingId, feedback }: {
   item: TimelineItem;
   onInspect: InspectHandler;
   onPrepare: (preset: ActionPreset) => void;
+  onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
   feedback?: AffairFeedback;
 }) {
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const closeRef = useCloseOnOutside<HTMLDivElement>(actionsOpen, () => setActionsOpen(false));
   const finished = ['completed', 'cancelled', '已完成', '已取消'].includes(item.status);
   return (
     <div
-      ref={closeRef}
-      className={`affair-row contextual-action-host ${itemStateClass(item)}${finished ? '' : ' actionable'}${actionsOpen ? ' action-open' : ''}`}
+      className={`affair-row contextual-action-host ${itemStateClass(item)}${finished ? '' : ' actionable'}`}
       data-item-id={item.id}
       role="button"
       tabIndex={0}
-      aria-expanded={finished ? undefined : actionsOpen}
       onClick={(event) => {
         if ((event.target as HTMLElement).closest('button')) return;
-        if (!finished && window.matchMedia('(hover: none)').matches) setActionsOpen((current) => !current);
-        else onInspect(item, event.currentTarget);
+        onInspect(item, event.currentTarget);
       }}
       onKeyDown={(event) => {
-        if (event.key === 'Enter') { event.preventDefault(); onInspect(item, event.currentTarget); }
-        else if (event.key === ' ' && !finished) { event.preventDefault(); setActionsOpen((current) => !current); }
-        else if (event.key === 'Escape') setActionsOpen(false);
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onInspect(item, event.currentTarget); }
       }}
     >
       <div className="affair-icon">事</div>
@@ -3026,88 +3631,78 @@ function AffairRow({ item, onInspect, onPrepare, onRetry, retryingId, feedback }
       </div>
       <div className="affair-meta">
         <Status value={item.status} />
-        {feedback && <small className={feedback.ok ? 'affair-feedback ok' : 'affair-feedback error'}>{feedback.text}</small>}
+        {feedback && <InlineResult ok={feedback.ok} text={feedback.text} />}
       </div>
-      {!finished && <div className="affair-row-inline-action"><ItemActionButtons item={item} onPrepare={(preset) => { setActionsOpen(false); onPrepare(preset); }} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>}
+      {!finished && <div className="affair-row-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>}
     </div>
   );
 }
 
-function QuickPendingItem({ item, onInspect, onPrepare, onRetry, retryingId, feedback }: {
+function QuickPendingItem({ item, onInspect, onPrepare, onQuick, onRetry, onRetryPrev, retryingId, feedback }: {
   item: TimelineItem;
   onInspect: InspectHandler;
   onPrepare: (preset: ActionPreset) => void;
+  onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
+  onRetryPrev?: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
   feedback?: AffairFeedback;
 }) {
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const closeRef = useCloseOnOutside<HTMLDivElement>(actionsOpen, () => setActionsOpen(false));
   return <div
-    ref={closeRef}
-    className={`quick-pending-item contextual-action-host ${itemStateClass(item)} actionable${actionsOpen ? ' action-open' : ''}`}
+    className={`quick-pending-item contextual-action-host ${itemStateClass(item)} actionable`}
     data-item-id={item.id}
     role="button"
     tabIndex={0}
-    aria-expanded={actionsOpen}
     onClick={(event) => {
       if ((event.target as HTMLElement).closest('button')) return;
-      if (window.matchMedia('(hover: none)').matches) setActionsOpen((current) => !current);
-      else onInspect(item, event.currentTarget);
+      onInspect(item, event.currentTarget);
     }}
     onKeyDown={(event) => {
-      if (event.key === 'Enter') { event.preventDefault(); onInspect(item, event.currentTarget); }
-      else if (event.key === ' ') { event.preventDefault(); setActionsOpen((current) => !current); }
-      else if (event.key === 'Escape') setActionsOpen(false);
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onInspect(item, event.currentTarget); }
     }}
   >
     <div className="quick-pending-main">
       <strong>{item.title}</strong>
       <span>{item.window_label || (item.next_prompt_at ? `下次提醒 ${formatDate(item.next_prompt_at)} ${formatTime(item.next_prompt_at)}` : '待处理')}</span>
-      {feedback && <small className={feedback.ok ? 'affair-feedback ok' : 'affair-feedback error'}>{feedback.text}</small>}
+      {feedback && <InlineResult ok={feedback.ok} text={feedback.text} />}
+      {feedback?.undo && onRetryPrev ? <button type="button" className="row-action-button" disabled={Boolean(retryingId)} onClick={() => void onRetryPrev(item)}>撤销推进</button> : null}
     </div>
     <div className="quick-pending-actions"><Status value={item.status} /></div>
-    <div className="quick-pending-inline-action"><ItemActionButtons item={item} onPrepare={(preset) => { setActionsOpen(false); onPrepare(preset); }} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>
+    <div className="quick-pending-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>
   </div>;
 }
 
-function CompactItem({ item, onInspect, onPrepare, onRetry, retryingId, feedback }: {
+function CompactItem({ item, onInspect, onPrepare, onQuick, onRetry, retryingId, feedback }: {
   item: TimelineItem;
   onInspect: InspectHandler;
   onPrepare: (preset: ActionPreset) => void;
+  onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
   retryingId: string | null;
   feedback?: AffairFeedback;
 }) {
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const closeRef = useCloseOnOutside<HTMLDivElement>(actionsOpen, () => setActionsOpen(false));
   const finished = ['completed', 'cancelled', '已完成', '已取消'].includes(item.status);
   return (
     <div
-      ref={closeRef}
-      className={`compact-item inspectable contextual-action-host ${itemStateClass(item)}${finished ? '' : ' actionable'}${actionsOpen ? ' action-open' : ''}`}
+      className={`compact-item inspectable contextual-action-host ${itemStateClass(item)}${finished ? '' : ' actionable'}`}
       data-item-id={item.id}
       role="button"
       tabIndex={0}
-      aria-expanded={finished ? undefined : actionsOpen}
       onClick={(event) => {
         if ((event.target as HTMLElement).closest('button')) return;
-        if (!finished && window.matchMedia('(hover: none)').matches) setActionsOpen((current) => !current);
-        else onInspect(item, event.currentTarget);
+        onInspect(item, event.currentTarget);
       }}
       onKeyDown={(event) => {
-        if (event.key === 'Enter') { event.preventDefault(); onInspect(item, event.currentTarget); }
-        else if (event.key === ' ' && !finished) { event.preventDefault(); setActionsOpen((current) => !current); }
-        else if (event.key === 'Escape') setActionsOpen(false);
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onInspect(item, event.currentTarget); }
       }}
     >
       <div>
         <strong>{item.title}</strong>
         <span>{item.window_label || formatDate(itemDate(item))}</span>
-        {feedback && <small className={feedback.ok ? 'affair-feedback ok' : 'affair-feedback error'}>{feedback.text}</small>}
+        {feedback && <InlineResult ok={feedback.ok} text={feedback.text} />}
       </div>
       <Status value={item.status} />
-      {!finished && <div className="compact-inline-action"><ItemActionButtons item={item} onPrepare={(preset) => { setActionsOpen(false); onPrepare(preset); }} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>}
+      {!finished && <div className="compact-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onRetry={onRetry} retryingId={retryingId} feedback={feedback} /></div>}
     </div>
   );
 }
