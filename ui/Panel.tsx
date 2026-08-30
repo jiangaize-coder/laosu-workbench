@@ -298,10 +298,6 @@ type ActionPreset = {
   week?: string;
 };
 
-const tabs: Array<{ id: Tab; label: string }> = [
-  { id: 'overview', label: '课表' },
-];
-
 const scopeLabels: Record<Scope, string> = {
   week: '周视图',
   month: '月视图',
@@ -1139,10 +1135,10 @@ function Panel() {
     <HanaThemeProvider mode="inherit" className="workbench-theme">
       <div className="workbench-shell" data-ui="workbench-shell" data-ui-id="workbench-main">
         <header className="topbar" data-ui="topbar">
-          <nav className="tabbar" aria-label="工作台导航" data-ui="primary-navigation">
-            {tabs.map((item) => (
-              <button type="button" key={item.id} className={tab === item.id ? 'tab active' : 'tab'} data-ui-role="nav-item" data-ui-id={`nav-${item.id}`} aria-current={tab === item.id ? 'page' : undefined} onClick={() => navigateTo(item.id)}>
-                {item.label}
+          <nav className="tabbar" aria-label="日程视图" data-ui="primary-navigation">
+            {(Object.keys(scopeLabels) as Scope[]).map((item) => (
+              <button type="button" key={item} className={scope === item ? 'tab active' : 'tab'} data-ui-role="nav-item" data-ui-id={`nav-${item}`} aria-current={scope === item ? 'page' : undefined} disabled={loading} onClick={() => void changeScope(item)}>
+                {scopeLabels[item]}
               </button>
             ))}
           </nav>
@@ -1161,19 +1157,6 @@ function Panel() {
           {error && <Notice tone="error" title="读取失败" text={error} />}
           {dashboard?.warnings?.length ? <Notice tone="warn" title="有警告" text={dashboard.warnings.join('；')} /> : null}
           {loading && !dashboard ? <LoadingState /> : null}
-          {dashboard && tab !== 'planning' && tab !== 'affairs' && <section className="global-scope-bar" aria-label="时间范围" aria-busy={loading}>
-            <div className="scope-context">
-              <span>{loading ? '正在更新时间' : '时间范围'}</span>
-              <strong>{formatRange(dashboard.range)}</strong>
-            </div>
-            <WorkbenchNav
-              label="时间范围切换"
-              busy={loading}
-              value={scope}
-              onChange={(next) => void changeScope(next as Scope)}
-              items={(Object.keys(scopeLabels) as Scope[]).map((item) => ({ id: item, label: scopeLabels[item] }))}
-            />
-          </section>}
           <div className={loading && dashboard ? 'view-content scope-loading' : 'view-content'} aria-busy={loading && Boolean(dashboard)} inert={loading && Boolean(dashboard)}>
             {dashboard && tab === 'overview' && (
               <Overview dashboard={dashboard} onInspect={openItemDetail} onOpenDay={openDayDetail} />
@@ -1246,7 +1229,7 @@ function Overview({ dashboard, onInspect, onOpenDay }: {
   const completedMinutes = completedCourses.reduce((sum, course) => sum + Number(course.duration || 0), 0);
   const conflicts = useMemo(() => detectScheduleConflicts(unifiedItems), [unifiedItems]);
   const activeAffairsMissingEnd = unifiedItems.filter((item) => item.domain === 'affair'
-    && item.start_at && !item.end_at && !['completed', 'cancelled'].includes(item.status));
+    && item.start_at && !item.end_at && !['completed', 'cancelled', '已完成', '已取消'].includes(item.status));
 
   return (
     <div className="view-stack read-only-schedule">

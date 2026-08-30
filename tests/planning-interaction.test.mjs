@@ -128,7 +128,9 @@ test('overview opens as a two-page unified schedule with week first', () => {
   assert.match(panel, /week: '周视图',[\s\S]*month: '月视图'/);
   assert.match(panel, /const requestedScope = \(params\.get\('scope'\) as Scope\) \|\| 'week'/);
   assert.doesNotMatch(panel, /storedScope/);
-  assert.match(panel, /const tabs:[\s\S]*\{ id: 'overview', label: '课表' \},[\s\S]*\];/);
+  assert.match(panel, /<nav className="tabbar" aria-label="日程视图"/);
+  assert.match(panel, /data-ui-id=\{`nav-\$\{item\}`\}/);
+  assert.doesNotMatch(panel, /label: '筹备'|label: '事务'/);
   assert.match(panel, /dashboard\.courses\.forEach/);
   assert.match(panel, /dashboard\.affairs\.forEach/);
   assert.match(panel, /visibleScheduleItems/);
