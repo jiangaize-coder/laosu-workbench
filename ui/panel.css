@@ -992,8 +992,21 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
   .day-group { padding: 10px; }
 }
 
-/* v0.5.13：真实周/月视图与统一二级抽屉。 */
+/* v2.12.4：只读周/月统一日程看板。 */
 .calendar-panel { grid-column: 1 / -1; padding: 18px; }
+.read-only-schedule { gap: 0; }
+.month-course-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 4px 0 14px; }
+.month-course-summary > div { display: flex; flex-direction: column; gap: 4px; min-height: 72px; justify-content: center; padding: 11px 14px; border-radius: 12px; background: color-mix(in srgb, var(--wb-accent) 7%, var(--wb-surface-soft)); }
+.month-course-summary span { color: var(--wb-muted); font-size: 11px; font-weight: 620; }
+.month-course-summary strong { color: var(--wb-text); font-size: 18px; font-weight: 760; }
+.schedule-conflict-alert { display: grid; gap: 7px; margin: 0 0 14px; padding: 12px 14px; border-radius: 12px; }
+.schedule-conflict-alert.error { background: color-mix(in srgb, var(--wb-state-error) 13%, var(--wb-card)); }
+.schedule-conflict-alert.warn { background: color-mix(in srgb, var(--wb-state-pending) 14%, var(--wb-card)); }
+.schedule-conflict-alert > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.schedule-conflict-alert > div strong { font-size: 13px; }
+.schedule-conflict-alert > div span,
+.schedule-conflict-alert p { margin: 0; color: var(--wb-muted); font-size: 11px; line-height: 1.5; }
+.refresh-local-button { white-space: nowrap; }
 .overview-side { grid-column: 1 / -1; }
 .week-calendar-scroll,
 .month-calendar-scroll { overflow-x: auto; overscroll-behavior-inline: contain; padding: 4px 1px 8px; scrollbar-width: thin; }
@@ -1847,3 +1860,9 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
 .quick-pending-item button:is(.primary, .secondary):hover { background: color-mix(in srgb, var(--wb-accent) 20%, var(--wb-card)); }
 
 /* 空队列不渲染功能块；建议单独出现时保持一块，不与待处理伪装成并列主任务。 */
+@media (max-width: 700px) {
+  .month-course-summary { grid-template-columns: 1fr; }
+  .month-course-summary > div { min-height: 58px; }
+  .schedule-conflict-alert > div { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .refresh-local-button { padding-inline: 9px; font-size: 11px; }
+}

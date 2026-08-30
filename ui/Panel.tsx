@@ -6,7 +6,7 @@ import { HanaThemeProvider } from '@hana/plugin-components';
 import '@hana/plugin-components/styles.css';
 import './panel.css';
 import './design-system.css';
-import { addDateDays, buildMonthGridDates, buildWeekDates, buildWeekPageSlots, calendarHourBounds, eventGeometry, itemDateKey, layoutOverlappingItems, parseDateRange, type CalendarItemLike } from './calendar-layout';
+import { addDateDays, buildMonthGridDates, buildWeekDates, buildWeekPageSlots, calendarHourBounds, detectScheduleConflicts, eventGeometry, itemDateKey, layoutOverlappingItems, parseDateRange, visibleScheduleItems, type CalendarItemLike, type UnifiedScheduleItem } from './calendar-layout';
 import { api } from './api-client';
 import { createRequestGate } from './request-gate';
 
@@ -37,7 +37,7 @@ type SuggestionCard = {
     ids?: string[];
   };
 };
-type Scope = 'today' | 'week' | 'month' | 'horizon';
+type Scope = 'week' | 'month';
 
 type TimelineItem = {
   id: string;
@@ -299,16 +299,12 @@ type ActionPreset = {
 };
 
 const tabs: Array<{ id: Tab; label: string }> = [
-  { id: 'overview', label: '总览' },
-  { id: 'planning', label: '筹备' },
-  { id: 'affairs', label: '事务' },
+  { id: 'overview', label: '课表' },
 ];
 
 const scopeLabels: Record<Scope, string> = {
-  today: '今天',
-  week: '本周',
-  month: '本月',
-  horizon: '未来',
+  week: '周视图',
+  month: '月视图',
 };
 
 const statusLabels: Record<string, string> = {
@@ -409,6 +405,14 @@ function formatRange(value?: string | null) {
   return start === end ? formatPart(start) : `${formatPart(start)}—${formatPart(end)}`;
 }
 
+function formatCourseMinutes(value: number) {
+  const minutes = Math.max(0, Math.round(Number(value) || 0));
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (!hours) return `${remainder} 分钟`;
+  return remainder ? `${hours} 小时 ${remainder} 分钟` : `${hours} 小时`;
+}
+
 function itemDate(item: TimelineItem) {
   return item.start_at || item.deadline_at || null;
 }
@@ -461,12 +465,10 @@ function writeWorkbenchCache(key: string, data: unknown) {
 
 function Panel() {
   const params = new URLSearchParams(window.location.search);
-  const storedTab = window.localStorage.getItem('laosu-workbench.tab');
-  const storedScope = window.localStorage.getItem('laosu-workbench.scope') as Scope | null;
-  const requestedTab = params.get('tab') || storedTab || 'overview';
-  const requestedScope = (params.get('scope') as Scope) || storedScope || 'week';
-  const initialTab = (tabs.map((item) => item.id) as string[]).includes(requestedTab) ? requestedTab as Tab : 'overview';
-  const initialScope = (['today', 'week', 'month', 'horizon'] as Scope[]).includes(requestedScope) ? requestedScope : 'week';
+  const requestedTab = params.get('tab') || 'overview';
+  const requestedScope = (params.get('scope') as Scope) || 'week';
+  const initialTab: Tab = 'overview';
+  const initialScope = (['week', 'month'] as Scope[]).includes(requestedScope) ? requestedScope : 'week';
   const initialPreview = params.get('preview');
   const [tab, setTab] = useState<Tab>(initialTab);
   const [scope, setScope] = useState<Scope>(initialScope);
@@ -697,9 +699,6 @@ function Panel() {
     return () => window.removeEventListener('pagehide', saveScroll);
   }, [tab]);
 
-  useEffect(() => {
-    window.localStorage.setItem('laosu-workbench.scope', scope);
-  }, [scope]);
 
   useEffect(() => {
     if (focusTarget?.tab === tab) return;
@@ -960,13 +959,13 @@ function Panel() {
   async function refreshCurrent(options: { silent?: boolean } = {}) {
     const silent = options.silent === true;
     if (!silent) setToast('正在刷新数据…');
-    // 一键全量扫描：总览 + 筹备 + 驾驶舱 + AI 上下文（fresh=1 服务端会失效全部快照）。
+    // fresh=1 失效服务端快照，重新读取排课与事务脚本。
     const ok = await loadDashboard(scope, { ...options, fresh: !silent });
     if (ok === true) {
       setAffairFeedback({});
       setDayCompleteFeedback(null);
       setPlanningRevision((current) => current + 1);
-      if (!silent) setToast('课表、筹备、驾驶舱和事务数据已全部刷新');
+      if (!silent) setToast('本地课程与事务数据已刷新');
     } else if (ok === false && !silent) {
       setToast('刷新失败，请查看页面错误');
     }
@@ -1153,7 +1152,7 @@ function Panel() {
             <button type="button" className={`${dashboard?.health?.ok ? 'health good' : 'health bad'} health-button${contextView?.kind === 'system' ? ' active' : ''}`} data-ui-role="button" data-ui-variant="secondary" data-ui-id="open-system-status" onClick={(event) => openSystem(event.currentTarget)} aria-expanded={contextView?.kind === 'system'}>
               <i />{dashboard?.health?.ok ? '系统正常' : '需要检查'}
             </button>
-            <button type="button" className="icon-button" data-ui-role="button" data-ui-variant="icon" data-ui-id="refresh-workbench" onClick={() => void refreshCurrent()} aria-label="刷新" disabled={loading}>↻</button>
+            <button type="button" className="ghost-button refresh-local-button" data-ui-role="button" data-ui-variant="secondary" data-ui-id="refresh-workbench" onClick={() => void refreshCurrent()} aria-label="刷新本地数据" disabled={loading}>↻ 刷新本地数据</button>
           </div>
         </header>
 
@@ -1177,7 +1176,7 @@ function Panel() {
           </section>}
           <div className={loading && dashboard ? 'view-content scope-loading' : 'view-content'} aria-busy={loading && Boolean(dashboard)} inert={loading && Boolean(dashboard)}>
             {dashboard && tab === 'overview' && (
-              <Overview dashboard={dashboard} pending={activePending} onInspect={openItemDetail} onOpenDay={openDayDetail} onPrepare={openAction} onRetry={handleAffairRetry} onRetryPrev={handleAffairRetryPrev} retryingId={quickBusyId} affairFeedback={affairFeedback} onDayComplete={handleDayComplete} dayBusy={dayCompleteBusy} dayFeedback={dayCompleteFeedback} onNavigate={navigateWithSection} onQuick={handleQuick} onAskAi={openAiWithDraft} onDataChanged={refreshCurrent} />
+              <Overview dashboard={dashboard} onInspect={openItemDetail} onOpenDay={openDayDetail} />
             )}
             {tab === 'planning' && <PlanningView onAction={openAction} onAskAi={openAiWithDraft} refreshKey={planningRevision} sectionHint={planningSectionHint} scheduleText={dashboard?.scheduleText} onDataChanged={refreshCurrent} />}
             {tab === 'affairs' && <AffairsView onQuick={handleQuick} onAskAi={openAiWithDraft} onPrepare={openAction} onInspect={openItemDetail} onRetry={handleAffairRetry} onRetryPrev={handleAffairRetryPrev} retryingId={quickBusyId} feedback={affairFeedback} refreshKey={planningRevision} observedAt={dashboard?.observedAt ?? ''} onOpenDay={(date, items, trigger) => openDayDetail(date, trigger, items)} localDate={dashboard?.localDate} />}
@@ -1195,18 +1194,7 @@ function Panel() {
               </div>
             </header>
             <div className="context-drawer-body">
-              {contextView && dashboard && <ContextDrawerContent
-                view={contextView}
-                dashboard={dashboard}
-                onQuick={handleQuick}
-                onAskAi={openAiWithDraft}
-                onPrepare={openAction}
-                onRetry={handleAffairRetry}
-                onRetryPrev={handleAffairRetryPrev}
-                retryingId={quickBusyId}
-                affairFeedback={affairFeedback}
-                onSync={() => openAction({ operation: 'calendar_sync' })}
-              />}
+              {contextView && dashboard && <ContextDrawerContent view={contextView} dashboard={dashboard} />}
             </div>
           </aside>
         </div>
@@ -1240,122 +1228,54 @@ function Panel() {
   );
 }
 
-function Overview({ dashboard, pending, onInspect, onOpenDay, onPrepare, onQuick, onAskAi, onRetry, onRetryPrev, retryingId, affairFeedback, onDayComplete, dayBusy, dayFeedback, onNavigate, onDataChanged }: {
+function Overview({ dashboard, onInspect, onOpenDay }: {
   dashboard: Dashboard;
-  pending: TimelineItem[];
   onInspect: InspectHandler;
   onOpenDay: OpenDayHandler;
-  onPrepare: (preset: ActionPreset) => void;
-  onRetry: (item: TimelineItem) => Promise<void>;
-  onRetryPrev?: (item: TimelineItem) => Promise<void>;
-  retryingId: string | null;
-  affairFeedback: Record<string, AffairFeedback>;
-  onDayComplete: (date: string) => Promise<void>;
-  dayBusy: boolean;
-  dayFeedback: AffairFeedback | null;
-  onNavigate: (tab: Tab, section?: string) => void;
-  onQuick: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
-  onAskAi: (draft: string) => void;
-  onDataChanged: (options?: { silent?: boolean }) => Promise<unknown>;
 }) {
-  const combinedItems = useMemo(() => {
-    const map = new Map<string, TimelineItem>();
-    dashboard.items.forEach((item) => map.set(item.id, item));
-    dashboard.affairs.forEach((item) => map.set(item.id, { ...item, domain: 'affair' }));
-    dashboard.courses.forEach((item) => map.set(item.id, { ...item, domain: 'course' }));
-    return Array.from(map.values()).sort((a, b) => String(itemDate(a) || '').localeCompare(String(itemDate(b) || '')));
-  }, [dashboard.items, dashboard.affairs, dashboard.courses]);
-  const groups = useMemo(() => {
-    const map = new Map<string, TimelineItem[]>();
-    combinedItems.forEach((item) => {
-      const key = itemDate(item)?.slice(0, 10) || '未定日期';
-      map.set(key, [...(map.get(key) || []), item]);
-    });
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [combinedItems]);
-  const todayCourses = dashboard.courses.filter((course) => course.start_at?.slice(0, 10) === dashboard.localDate && course.status !== '已取消');
-  const pendingToday = todayCourses.filter((course) => course.status === '待上课');
-  const finalEnd = todayCourses.map((course) => course.end_at).filter(Boolean).sort().at(-1) || null;
-  const dayEnded = Boolean(finalEnd && Date.now() >= new Date(finalEnd).getTime());
-  const dayButtonLabel = dayBusy ? '处理中…' : dayFeedback?.buttonLabel || (pendingToday.length ? '全部上完' : '已全部记录');
-  const dayButtonDisabled = dayBusy || Boolean(dayFeedback?.ok) || !pendingToday.length || !dayEnded;
-  const headline = ({
-    today: '把今天安排清楚。',
-    week: '把今天和这周，放在一张桌面上。',
-    month: '把这个月的课程和事务放在一张桌面上。',
-    horizon: '把未来安排放在一张桌面上。',
-  } as Record<Scope, string>)[dashboard.scope];
+  const unifiedItems = useMemo<UnifiedScheduleItem[]>(() => {
+    const map = new Map<string, UnifiedScheduleItem>();
+    dashboard.courses.forEach((item) => map.set(item.id, { ...item, domain: 'course' } as UnifiedScheduleItem));
+    dashboard.affairs.forEach((item) => map.set(item.id, { ...item, domain: 'affair' } as UnifiedScheduleItem));
+    return visibleScheduleItems([...map.values()]).sort((a, b) => String(itemDate(a) || '').localeCompare(String(itemDate(b) || '')));
+  }, [dashboard.courses, dashboard.affairs]);
+  const courseItems = unifiedItems.filter((item) => item.domain === 'course');
+  const countedCourses = courseItems.filter((course) => !['已取消', '已调课', 'cancelled'].includes(course.status));
+  const completedCourses = countedCourses.filter((course) => ['已完成', 'completed'].includes(course.status));
+  const totalMinutes = countedCourses.reduce((sum, course) => sum + Number(course.duration || 0), 0);
+  const completedMinutes = completedCourses.reduce((sum, course) => sum + Number(course.duration || 0), 0);
+  const conflicts = useMemo(() => detectScheduleConflicts(unifiedItems), [unifiedItems]);
+  const activeAffairsMissingEnd = unifiedItems.filter((item) => item.domain === 'affair'
+    && item.start_at && !item.end_at && !['completed', 'cancelled'].includes(item.status));
 
   return (
-    <div className="view-stack">
-      <PageTitle
-        eyebrow={`课务总览 · ${scopeLabels[dashboard.scope]}`}
-        title={headline}
-        description="先看下一步，再处理欠账，最后看完整安排。"
-      />
-
-      <NextCourseBanner course={dashboard.nextCourse || null} advice={dashboard.commuteAdvice || null} onOpen={(trigger) => dashboard.nextCourse && onInspect(dashboard.nextCourse, trigger)} onQuick={onQuick} onAskAi={onAskAi} />
-
-      {dashboard.scope === 'today' && ((pendingToday.length > 0 && dayEnded) || dayFeedback) && <section className="day-complete-bar">
-        <div>
-          <p className="eyebrow">今日收课</p>
-          <strong>{pendingToday.length ? `还有 ${pendingToday.length} 节待记录` : '今日课程已全部记录'}</strong>
-          <span>提交后会写入本地课表并同步日历</span>
-          {dayFeedback && <InlineResult ok={dayFeedback.ok} text={dayFeedback.text} />}
+    <div className="view-stack read-only-schedule">
+      <div className="panel wide calendar-panel">
+        <PanelHeading title={dashboard.scope === 'week' ? '周课表' : '月课表'} meta={formatRange(dashboard.range)} />
+        {dashboard.scope === 'month' && <section className="month-course-summary" aria-label="本月课时统计">
+          <div><span>排定课程</span><strong>{countedCourses.length} 节</strong></div>
+          <div><span>总课时</span><strong>{formatCourseMinutes(totalMinutes)}</strong></div>
+          <div><span>已完成</span><strong>{completedCourses.length} 节 · {formatCourseMinutes(completedMinutes)}</strong></div>
+        </section>}
+        {(conflicts.length > 0 || activeAffairsMissingEnd.length > 0) && <section className={conflicts.length ? 'schedule-conflict-alert error' : 'schedule-conflict-alert warn'} aria-label="日程冲突检查">
+          <div><strong>{conflicts.length ? `${conflicts.length} 处时间冲突` : '冲突检查不完整'}</strong><span>刷新后按本地课程与事务数据即时核对</span></div>
+          {conflicts.slice(0, 4).map((conflict) => <p key={conflict.id}>
+            {conflict.kind === 'course-course' ? '课程重叠' : conflict.kind === 'course-affair' ? '课程／事务冲突' : '事务重叠'}：
+            {conflict.left.title} ↔ {conflict.right.title} · {formatDate(conflict.start, { month: 'numeric', day: 'numeric' })} {formatTime(conflict.start)}–{formatTime(conflict.end)}
+          </p>)}
+          {activeAffairsMissingEnd.length > 0 && <p>{activeAffairsMissingEnd.length} 个进行中事务缺结束时间，无法完整判断重叠。</p>}
+        </section>}
+        <div className="calendar-legend" aria-label="状态颜色图例">
+          <span className="confirmed"><i />课程</span>
+          <span className="pending"><i />事务／待确认</span>
+          <span className="finished"><i />已完成</span>
+          <span className="muted"><i />已取消</span>
+          <span className="temporary"><i />临时</span>
         </div>
-        <button
-          type="button"
-          className="primary-button"
-          disabled={dayButtonDisabled}
-          onClick={() => void onDayComplete(dashboard.localDate)}
-        >{dayButtonLabel}</button>
-      </section>}
-
-      <SuggestionCards
-        observedAt={dashboard.observedAt}
-        pending={pending}
-        onInspect={onInspect}
-        onPrepare={onPrepare}
-        onOpenDay={onOpenDay}
-        onNavigate={onNavigate}
-        onQuick={onQuick}
-        onAskAi={onAskAi}
-        onRetry={onRetry}
-        onRetryPrev={onRetryPrev}
-        retryingId={retryingId}
-        affairFeedback={affairFeedback}
-        onDataChanged={onDataChanged}
-      />
-        <div className={dashboard.scope === 'week' || dashboard.scope === 'month' ? 'panel wide calendar-panel' : 'panel wide'}>
-          <PanelHeading
-            title={dashboard.scope === 'week' ? '周视图' : dashboard.scope === 'month' ? '月视图' : '时间轴'}
-            meta={formatRange(dashboard.range)}
-          />
-          {(dashboard.scope === 'week' || dashboard.scope === 'month') && <div className="calendar-legend" aria-label="状态颜色图例">
-            <span className="confirmed"><i />已确认</span>
-            <span className="pending"><i />待确认／待处理</span>
-            <span className="finished"><i />已完成·留痕</span>
-            <span className="muted"><i />已取消</span>
-            <span className="error"><i />错误／硬阻塞</span>
-            <span className="temporary"><i />临时身份</span>
-            <small>石板色=上过课留痕；过期未标记的课程以琥珀“过期”提示，待补标记</small>
-          </div>}
-          {dashboard.scope === 'week'
-            ? <WeekCalendar items={combinedItems} range={dashboard.range} localDate={dashboard.localDate} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} retryingId={retryingId} affairFeedback={affairFeedback} />
-            : dashboard.scope === 'month'
-              ? <MonthCalendar items={combinedItems} range={dashboard.range} localDate={dashboard.localDate} onOpenDay={onOpenDay} />
-              : groups.length ? groups.map(([date, items]) => (
-                <div className="day-group" key={date}>
-                  <div className="day-label">
-                    <strong>{date === '未定日期' ? date : formatDate(`${date}T12:00:00+08:00`, { month: 'long', day: 'numeric', weekday: 'short' })}</strong>
-                    <span>{items.length} 项</span>
-                  </div>
-                  <div className="timeline-list">
-                    {items.map((item) => <TimelineRow key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} retryingId={retryingId} feedback={affairFeedback[item.id]} />)}
-                  </div>
-                </div>
-              )) : <Empty title="这个范围没有安排" text="可以切换时间范围，或用 AI 操作创建和调整。" />}
-        </div>
+        {dashboard.scope === 'week'
+          ? <WeekCalendar items={unifiedItems} range={dashboard.range} localDate={dashboard.localDate} onInspect={onInspect} />
+          : <MonthCalendar items={unifiedItems} range={dashboard.range} localDate={dashboard.localDate} onOpenDay={onOpenDay} />}
+      </div>
     </div>
   );
 }
@@ -1637,17 +1557,11 @@ function useHorizontalDrag() {
   return { ref, onPointerDown, onPointerMove, onPointerUp: finish, onPointerCancel: finish };
 }
 
-function WeekCalendar({ items, range, localDate, onInspect, onPrepare, onQuick, onAskAi, onRetry, retryingId, affairFeedback }: {
+function WeekCalendar({ items, range, localDate, onInspect }: {
   items: TimelineItem[];
   range: string;
   localDate: string;
   onInspect: InspectHandler;
-  onPrepare: (preset: ActionPreset) => void;
-  onQuick: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
-  onAskAi: (draft: string) => void;
-  onRetry: (item: TimelineItem) => Promise<void>;
-  retryingId: string | null;
-  affairFeedback: Record<string, AffairFeedback>;
 }) {
   const dates = useMemo(() => buildWeekDates(range, localDate), [range, localDate]);
   const dragScroll = useHorizontalDrag();
@@ -1741,12 +1655,10 @@ const placementsByDate = useMemo(() => {
                 if (!geometry) return null;
                 const width = 100 / laneCount;
                 const timeValue = item.start_at || item.deadline_at;
-                const finished = ['completed', 'cancelled', '已完成', '已取消', '已调课'].includes(item.status);
-                const actionable = !finished && (item.domain === 'affair' || Boolean(item.start_at));
                 const overdue = courseOverdue(item, localDate);
                 return <article
                   key={item.id}
-                  className={`week-time-block contextual-action-host ${item.domain} ${itemStateClass(item, localDate)}${isTemporaryItem(item) ? ' temporary' : ''}${actionable ? ' actionable' : ''}`}
+                  className={`week-time-block ${item.domain} ${itemStateClass(item, localDate)}${isTemporaryItem(item) ? ' temporary' : ''}`}
                   style={{ top: geometry.top, height: geometry.height, left: `calc(${lane * width}% + 4px)`, width: `calc(${width}% - 8px)` }}
                   tabIndex={0}
                   role="button"
@@ -1761,11 +1673,10 @@ const placementsByDate = useMemo(() => {
                     }
                   }}
                   data-item-id={item.id}
-                  aria-label={`${formatTime(timeValue)} ${item.title}${overdue ? '（已过期待标记）' : ''}，${item.domain === 'course' ? `${item.duration || '—'} 分钟课程` : '事务'}${actionable ? '；移入后可直接操作，Enter 打开详情' : '，打开详情'}`}
+                  aria-label={`${formatTime(timeValue)} ${item.title}${overdue ? '（已过期待标记）' : ''}，${item.domain === 'course' ? `${item.duration || '—'} 分钟课程` : '事务'}，打开详情`}
                 >
                   <strong>{formatTime(timeValue)} · {item.title}{overdue ? '（过期）' : ''}</strong>
-                  <span>{item.domain === 'course' ? `${item.duration || '—'} 分钟` : item.estimated_minutes ? `${item.estimated_minutes} 分钟 · 事务` : '事务'}</span>
-                  {actionable && <div className="week-card-inline-action"><ItemActionButtons item={item} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} retryingId={retryingId} feedback={affairFeedback[item.id]} compact /></div>}
+                  <span>{item.domain === 'course' ? `${item.duration || '—'} 分钟 · 课程` : item.estimated_minutes ? `${item.estimated_minutes} 分钟 · 事务` : '事务'}</span>
                 </article>;
               })}
             </div>;
@@ -3367,19 +3278,8 @@ function AiActionWorkspace({ initialDraft, preview, busy, onPreview, onCommit, o
   );
 }
 
-function ContextDrawerContent({ view, dashboard, onPrepare, onQuick, onAskAi, onRetry, onRetryPrev, retryingId, affairFeedback, onSync }: {
-  view: ContextView;
-  dashboard: Dashboard;
-  onPrepare: (preset: ActionPreset) => void;
-  onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
-  onAskAi?: (draft: string) => void;
-  onRetry: (item: TimelineItem) => Promise<void>;
-  onRetryPrev?: (item: TimelineItem) => Promise<void>;
-  retryingId: string | null;
-  affairFeedback: Record<string, AffairFeedback>;
-  onSync: () => void;
-}) {
-  if (view.kind === 'system') return <SystemView dashboard={dashboard} onSync={onSync} embedded />;
+function ContextDrawerContent({ view, dashboard }: { view: ContextView; dashboard: Dashboard }) {
+  if (view.kind === 'system') return <SystemView dashboard={dashboard} embedded readOnly />;
   const items = view.kind === 'day'
     ? (view.items
       ? [...view.items].sort((a, b) => String(itemDate(a) || '').localeCompare(String(itemDate(b) || '')))
@@ -3387,32 +3287,12 @@ function ContextDrawerContent({ view, dashboard, onPrepare, onQuick, onAskAi, on
     : [view.item];
   if (!items.length) return <Empty title="当天没有安排" text="当前时间范围内没有课程或事务。" />;
   return <div className="context-item-list">
-    {items.map((item) => <ContextItemCard
-      key={item.id}
-      item={item}
-      onPrepare={onPrepare}
-      onQuick={onQuick}
-      onAskAi={onAskAi}
-      onRetry={onRetry}
-      onRetryPrev={onRetryPrev}
-      retryingId={retryingId}
-      feedback={item.domain === 'affair' ? affairFeedback[item.id] : undefined}
-    />)}
+    {items.map((item) => <ContextItemCard key={item.id} item={item} />)}
   </div>;
 }
 
-function ContextItemCard({ item, onPrepare, onQuick, onAskAi, onRetry, onRetryPrev, retryingId, feedback }: {
-  item: TimelineItem;
-  onPrepare: (preset: ActionPreset) => void;
-  onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
-  onAskAi?: (draft: string) => void;
-  onRetry: (item: TimelineItem) => Promise<void>;
-  onRetryPrev?: (item: TimelineItem) => Promise<void>;
-  retryingId: string | null;
-  feedback?: AffairFeedback;
-}) {
+function ContextItemCard({ item }: { item: TimelineItem }) {
   const date = itemDate(item);
-  const finished = ['completed', 'cancelled', '已完成', '已取消'].includes(item.status);
   return <section className={`context-item-card ${itemStateClass(item)}${isTemporaryItem(item) ? ' temporary' : ''}`} data-item-id={item.id}>
     <header>
       <div><span className={`context-domain ${item.domain}`}>{item.domain === 'course' ? '课程' : '事务'}</span><time>{date ? `${formatDate(date, { month: 'long', day: 'numeric', weekday: 'short' })} ${formatTime(date)}` : '时间待定'}</time></div>
@@ -3420,21 +3300,6 @@ function ContextItemCard({ item, onPrepare, onQuick, onAskAi, onRetry, onRetryPr
     </header>
     <h3>{item.title}</h3>
     <p>{item.domain === 'course' ? `${item.duration || '—'} 分钟 · ${item.note || '常规课程'}` : item.note || item.window_label || '暂无补充说明'}</p>
-    {feedback && <InlineResult ok={feedback.ok} text={feedback.text} />}
-    {feedback?.undo && onRetryPrev ? <button type="button" className="row-action-button" disabled={Boolean(retryingId)} onClick={() => void onRetryPrev(item)}>撤销推进</button> : null}
-    {!finished && <div className="context-item-actions">
-      {item.domain === 'course' ? <>
-        <button type="button" className="primary-button" data-ui-role="button" data-ui-variant="primary" data-ui-action="course-move" onClick={() => onAskAi?.(`把${item.title} ${item.start_at?.slice(5, 10)} ${item.start_at?.slice(11, 16)} 的这节课调一下时间`)}>调时间</button>
-        <button type="button" className="row-action-button quiet-danger" disabled={Boolean(retryingId)} onClick={() => onQuick?.('courseCancel', item)}>本次不上</button>
-      </> : <>
-        <button type="button" className="primary-button" disabled={Boolean(retryingId) || feedback?.ok} onClick={() => onQuick?.('affairComplete', item)}>{feedback?.ok ? '已完成' : '完成'}</button>
-        {item.retry
-          ? <button type="button" className={feedback?.ok ? 'row-action-button quick-success' : 'row-action-button'} disabled={Boolean(retryingId) || Boolean(feedback?.ok)} onClick={() => void onRetry(item)}>{retryingId === item.id ? '处理中…' : feedback?.buttonLabel || '没约上'}</button>
-          : onAskAi
-            ? <button type="button" className="row-action-button" data-ui-role="button" data-ui-variant="secondary" data-ui-action="affair-adjust" onClick={() => onAskAi(`把「${item.title}」（${item.id}）调整一下`)}>调时间</button>
-            : <button type="button" className="row-action-button quiet-danger" onClick={() => onPrepare({ operation: 'affair_cancel', id: item.id, expectedVersion: item.version })}>取消…</button>}
-      </>}
-    </div>}
   </section>;
 }
 
@@ -3464,7 +3329,7 @@ function VersionPanel() {
   );
 }
 
-function CalendarHealthPanel({ onSync }: { onSync: () => void }) {
+function CalendarHealthPanel({ onSync, readOnly = false }: { onSync?: () => void; readOnly?: boolean }) {
   const [state, setState] = useState<{ loading: boolean; data?: { ok?: boolean; inSync?: boolean; diff?: { calendarEvents?: number; managedEvents?: number; desiredEvents?: number; toCreate?: { summary?: string; start?: string }[]; toUpdate?: { summary?: string; start?: string }[]; toDelete?: { summary?: string; start?: string }[] }; output?: string }; error?: string }>({ loading: true });
   const load = useCallback(() => {
     setState({ loading: true });
@@ -3500,7 +3365,7 @@ function CalendarHealthPanel({ onSync }: { onSync: () => void }) {
           )}
           <div className="row-actions">
             <button type="button" className="ghost-button" onClick={load}>重新盘点</button>
-            {!inSync && <button type="button" className="primary-button" onClick={onSync}>打开同步操作</button>}
+            {!readOnly && !inSync && onSync && <button type="button" className="primary-button" onClick={onSync}>打开同步操作</button>}
           </div>
         </>
       )}
@@ -3508,7 +3373,7 @@ function CalendarHealthPanel({ onSync }: { onSync: () => void }) {
   );
 }
 
-function SystemView({ dashboard, onSync, embedded = false }: { dashboard: Dashboard; onSync: () => void; embedded?: boolean }) {
+function SystemView({ dashboard, onSync, embedded = false, readOnly = false }: { dashboard: Dashboard; onSync?: () => void; embedded?: boolean; readOnly?: boolean }) {
   const verification = dashboard.health?.database?.verification;
   return (
     <div className={embedded ? 'view-stack system-embedded' : 'view-stack'}>
@@ -3529,14 +3394,14 @@ function SystemView({ dashboard, onSync, embedded = false }: { dashboard: Dashbo
           <Check label="维护模式" ok={!dashboard.health?.maintenance} detail={dashboard.health?.maintenance ? '已开启' : '未开启'} />
           <Check label="写入锁" ok={!dashboard.health?.writer?.active} detail={dashboard.health?.writer?.active ? `由 ${dashboard.health.writer.owner} 占用` : '当前空闲'} />
         </div>
-        <div className="panel action-panel">
+        {!readOnly && onSync && <div className="panel action-panel">
           <p className="eyebrow">飞书看板</p>
           <h3>同步前会先预演。</h3>
           <p>正式同步固定使用 <code>--prune</code>，清理已不存在的受管事件。</p>
           <button type="button" className="primary-button" onClick={onSync}>打开同步操作</button>
-        </div>
+        </div>}
       </section>
-      <CalendarHealthPanel onSync={onSync} />
+      <CalendarHealthPanel onSync={onSync} readOnly={readOnly} />
       <VersionPanel />
     </div>
   );

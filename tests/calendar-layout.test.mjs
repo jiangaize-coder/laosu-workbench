@@ -6,10 +6,12 @@ import {
   buildWeekDates,
   buildWeekPageSlots,
   calendarHourBounds,
+  detectScheduleConflicts,
   eventGeometry,
   itemDateKey,
   layoutOverlappingItems,
   parseDateRange,
+  visibleScheduleItems,
 } from '../ui/calendar-layout.ts';
 
 test('parseDateRange accepts dashboard range text', () => {
@@ -48,6 +50,30 @@ test('event geometry follows course or affair time and duration', () => {
   assert.deepEqual(eventGeometry({ start_at: '2026-08-23T13:30:00+08:00', duration: 60 }, 10, 22), { top: 196, height: 56 });
   assert.deepEqual(eventGeometry({ deadline_at: '2026-08-23T19:00:00+08:00', estimated_minutes: 30 }, 10, 22), { top: 504, height: 30 });
   assert.equal(itemDateKey({ window_start: '2026-08-24' }), '2026-08-24');
+});
+
+test('visible schedule hides cancelled, moved, deleted and exact duplicate records', () => {
+  const items = visibleScheduleItems([
+    { id: 'course-1', domain: 'course', title: '王同学', status: '待上课', start_at: '2026-09-01T18:00:00+08:00', end_at: '2026-09-01T19:00:00+08:00', duration: 60 },
+    { id: 'course-duplicate', domain: 'course', title: '王同学', status: '待上课', start_at: '2026-09-01T18:00:00+08:00', end_at: '2026-09-01T19:00:00+08:00', duration: 60 },
+    { id: 'course-moved', domain: 'course', title: '李同学', status: '已调课', start_at: '2026-09-02T18:00:00+08:00', end_at: '2026-09-02T19:00:00+08:00', duration: 60 },
+    { id: 'affair-cancelled', domain: 'affair', title: '复查', status: 'cancelled', start_at: '2026-09-03T15:00:00+08:00', end_at: '2026-09-03T16:00:00+08:00' },
+    { id: 'course-completed', domain: 'course', title: '张同学', status: '已完成', start_at: '2026-09-04T18:00:00+08:00', end_at: '2026-09-04T19:00:00+08:00', duration: 60 },
+  ]);
+  assert.deepEqual(items.map((item) => item.id), ['course-1', 'course-completed']);
+});
+
+test('conflict detection covers course-course, course-affair and affair-affair but ignores closed items', () => {
+  const base = [
+    { id: 'course-a', domain: 'course', title: 'A', status: '待上课', start_at: '2026-09-01T18:00:00+08:00', end_at: '2026-09-01T19:00:00+08:00' },
+    { id: 'course-b', domain: 'course', title: 'B', status: '待上课', start_at: '2026-09-01T18:30:00+08:00', end_at: '2026-09-01T19:30:00+08:00' },
+    { id: 'affair-a', domain: 'affair', title: '事务 A', status: 'active', start_at: '2026-09-01T18:45:00+08:00', end_at: '2026-09-01T19:15:00+08:00' },
+    { id: 'affair-b', domain: 'affair', title: '事务 B', status: 'active', start_at: '2026-09-01T19:00:00+08:00', end_at: '2026-09-01T19:20:00+08:00' },
+    { id: 'closed', domain: 'course', title: '已取消', status: '已取消', start_at: '2026-09-01T18:00:00+08:00', end_at: '2026-09-01T20:00:00+08:00' },
+  ];
+  const kinds = new Set(detectScheduleConflicts(base).map((conflict) => conflict.kind));
+  assert.deepEqual([...kinds].sort(), ['affair-affair', 'course-affair', 'course-course']);
+  assert.equal(detectScheduleConflicts(base).some((conflict) => conflict.left.id === 'closed' || conflict.right.id === 'closed'), false);
 });
 
 test('course and affair overlaps share lanes in one time grid', () => {

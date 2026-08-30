@@ -27,20 +27,17 @@ test('landed cards switch to formal-course actions without an empty layer', () =
   assert.doesNotMatch(panel, /disabled=\{hardBlockers\.length > 0\} title=/);
 });
 
-test('overview and affair cards share contextual two-action mappings', () => {
-  assert.match(panel, /function ItemActionButtons/);
-  assert.match(panel, /item\.domain === 'course'/);
-  // 交互铁律：决策类一键（本次不上/完成/没约上），需要输入的走表单（调整时间），取消走详情
-  assert.match(panel, /onQuick\('courseCancel', item\)/);
-  assert.match(panel, /onQuick\?\.\('affairComplete', item\)/);
-  assert.match(panel, />本次不上<\/button>/);
-  assert.match(panel, /'没约上'/);
-  assert.match(panel, /的这节课调一下时间/);
-  assert.match(panel, /week-card-inline-action/);
-  assert.match(panel, /affair-row-inline-action/);
-  assert.match(panel, /quick-pending-inline-action/);
-  assert.match(panel, /compact-inline-action/);
-  assert.match(css, /contextual-action-host\.actionable:hover/);
+test('primary week and month schedule is read-only while AI keeps operation capability', () => {
+  assert.match(panel, /function Overview\(\{ dashboard, onInspect, onOpenDay \}/);
+  assert.match(panel, /function WeekCalendar\(\{ items, range, localDate, onInspect \}/);
+  assert.match(panel, /function ContextItemCard\(\{ item \}: \{ item: TimelineItem \}\)/);
+  assert.match(panel, /<WeekCalendar items=\{unifiedItems\}/);
+  assert.match(panel, /<MonthCalendar items=\{unifiedItems\}/);
+  assert.match(panel, /AI 操作/);
+  const weekView = panel.slice(panel.indexOf('function WeekCalendar'), panel.indexOf('function MonthCalendar'));
+  assert.doesNotMatch(weekView, /ItemActionButtons|onQuick|onPrepare|onAskAi/);
+  const contextCard = panel.slice(panel.indexOf('function ContextItemCard'), panel.indexOf('function VersionPanel'));
+  assert.doesNotMatch(contextCard, /本次不上|调时间|取消…|affairComplete/);
 });
 
 test('refreshing content is inert and custom buttons prevent Space from scrolling', () => {
@@ -64,12 +61,11 @@ test('overview and planning share one semantic color system', () => {
   assert.match(css, /--wb-kind-temporary: #668ca8/);
   assert.match(panel, /function itemStateClass/);
   assert.match(panel, /function isTemporaryItem/);
-  assert.match(panel, /已确认/);
-  assert.match(panel, /待确认／待处理/);
-  assert.match(panel, /已完成·留痕/);
+  assert.match(panel, /<i \/>课程/);
+  assert.match(panel, /<i \/>事务／待确认/);
+  assert.match(panel, /<i \/>已完成/);
   assert.match(panel, /function courseOverdue/);
-  assert.match(panel, /过期未标记的课程以琥珀/);
-  assert.match(panel, /错误／硬阻塞/);
+  assert.match(panel, /schedule-conflict-alert/);
   assert.match(css, /--wb-state-finished: #6e8290/);
   assert.match(css, /week-time-block\.state-finished/);
   assert.match(css, /calendar-legend \.finished i/);
@@ -127,22 +123,19 @@ test('reservation actions update locally and refresh all data without blocking t
   assert.match(panel, /if \(!silent\) \{\s*setLoading\(true\)/);
 });
 
-test('overview keeps three levels: next action, required work, full schedule', () => {
-  assert.match(panel, /const requiredCards = allCards\.filter\(\(card\) => card\.bucket === 'required'\)/);
-  assert.match(panel, /const suggestionCards = allCards\.filter\(\(card\) => card\.bucket === 'suggestion'/);
-  assert.match(panel, /const pendingItems = pending\.filter\(\(item\) => !requiredEntityIds\.has\(item\.id\)\)/);
-  assert.match(panel, /const requiredCount = pendingItems\.length \+ requiredCards\.length/);
-  assert.match(panel, /if \(!requiredCount && !suggestionCards\.length\) return null/);
-  assert.match(panel, /className="panel pending-action-panel action-center"/);
-  assert.match(panel, /<details className="action-suggestions">/);
-  assert.match(panel, /requiredCards\.map\(\(card\) => renderCard\(card, false\)\)/);
-  assert.match(panel, /suggestionCards\.map\(\(card\) => renderCard\(card, true\)\)/);
-  assert.doesNotMatch(panel, /pending\.slice\(0, 4\)/);
-  assert.doesNotMatch(panel, /<Metric label="待办"/);
-  assert.doesNotMatch(panel, /<Metric label="下一项"/);
-  assert.match(panel, /if \(!course\) return null/);
-  assert.doesNotMatch(panel, /未来范围内没有课程/);
-  assert.ok(panel.indexOf('<NextCourseBanner') < panel.indexOf('<SuggestionCards'));
+test('overview opens as a two-page unified schedule with week first', () => {
+  assert.match(panel, /type Scope = 'week' \| 'month'/);
+  assert.match(panel, /week: '周视图',[\s\S]*month: '月视图'/);
+  assert.match(panel, /const requestedScope = \(params\.get\('scope'\) as Scope\) \|\| 'week'/);
+  assert.doesNotMatch(panel, /storedScope/);
+  assert.match(panel, /const tabs:[\s\S]*\{ id: 'overview', label: '课表' \},[\s\S]*\];/);
+  assert.match(panel, /dashboard\.courses\.forEach/);
+  assert.match(panel, /dashboard\.affairs\.forEach/);
+  assert.match(panel, /visibleScheduleItems/);
+  assert.match(panel, /detectScheduleConflicts\(unifiedItems\)/);
+  assert.match(panel, /month-course-summary/);
+  assert.match(panel, /刷新本地数据/);
+  assert.doesNotMatch(panel.slice(panel.indexOf('function Overview'), panel.indexOf('function SuggestionCards')), /NextCourseBanner|SuggestionCards|pending-action-panel/);
 });
 
 test('affair records separate scheduled work from completed history', () => {

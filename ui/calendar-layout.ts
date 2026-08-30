@@ -104,6 +104,72 @@ export function eventGeometry(item: CalendarItemLike, startHour: number, endHour
   };
 }
 
+export type UnifiedScheduleItem = Omit<CalendarItemLike, 'duration'> & {
+  id: string;
+  title: string;
+  domain: 'course' | 'affair';
+  status: string;
+  duration?: number;
+};
+
+export type ScheduleConflict = {
+  id: string;
+  kind: 'course-course' | 'course-affair' | 'affair-affair';
+  start: string;
+  end: string;
+  left: UnifiedScheduleItem;
+  right: UnifiedScheduleItem;
+};
+
+const CLOSED_STATUSES = new Set(['completed', 'cancelled', '已完成', '已取消', '已调课']);
+const HIDDEN_SCHEDULE_STATUSES = new Set(['cancelled', 'deleted', 'removed', 'void', '已取消', '已调课', '已删除', '删除']);
+
+export function visibleScheduleItems(items: UnifiedScheduleItem[]) {
+  const visible = new Map<string, UnifiedScheduleItem>();
+  for (const item of items) {
+    const status = String(item.status || '').trim().toLowerCase();
+    if (HIDDEN_SCHEDULE_STATUSES.has(status)) continue;
+    const start = item.start_at || item.deadline_at || item.window_start || '';
+    const title = String(item.title || '').trim().replace(/\s+/g, ' ').toLowerCase();
+    const signature = start
+      ? [item.domain, title, start, item.end_at || '', item.duration || item.estimated_minutes || ''].join('|')
+      : `id:${item.id}`;
+    const previous = visible.get(signature);
+    if (!previous || (['completed', '已完成'].includes(item.status) && !['completed', '已完成'].includes(previous.status))) {
+      visible.set(signature, item);
+    }
+  }
+  return [...visible.values()];
+}
+
+export function detectScheduleConflicts(items: UnifiedScheduleItem[]) {
+  const active = items
+    .filter((item) => !CLOSED_STATUSES.has(item.status) && item.start_at && item.end_at)
+    .map((item) => ({ item, start: new Date(item.start_at as string).getTime(), end: new Date(item.end_at as string).getTime() }))
+    .filter((entry) => Number.isFinite(entry.start) && Number.isFinite(entry.end) && entry.end > entry.start)
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+  const conflicts: ScheduleConflict[] = [];
+  for (let leftIndex = 0; leftIndex < active.length; leftIndex += 1) {
+    const left = active[leftIndex];
+    for (let rightIndex = leftIndex + 1; rightIndex < active.length; rightIndex += 1) {
+      const right = active[rightIndex];
+      if (right.start >= left.end) break;
+      if (left.item.id === right.item.id || right.end <= left.start) continue;
+      const domains = [left.item.domain, right.item.domain].sort().join('-');
+      const kind = domains === 'course-course' ? 'course-course' : domains === 'affair-affair' ? 'affair-affair' : 'course-affair';
+      conflicts.push({
+        id: `${left.item.id}:${right.item.id}`,
+        kind,
+        start: new Date(Math.max(left.start, right.start)).toISOString(),
+        end: new Date(Math.min(left.end, right.end)).toISOString(),
+        left: left.item,
+        right: right.item,
+      });
+    }
+  }
+  return conflicts;
+}
+
 export function layoutOverlappingItems<T extends CalendarItemLike>(items: T[]) {
   const timed = items.map((item) => {
     const startValue = item.start_at || item.deadline_at;
