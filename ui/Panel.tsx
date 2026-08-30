@@ -800,13 +800,6 @@ function Panel() {
     [dashboard],
   );
 
-  const upcoming = useMemo(() => {
-    const now = Date.now();
-    return (dashboard?.items ?? [])
-      .filter((item) => itemDate(item) && new Date(itemDate(item) as string).getTime() >= now && !['completed', 'cancelled', '已完成', '已取消'].includes(item.status))
-      .sort((a, b) => new Date(itemDate(a) as string).getTime() - new Date(itemDate(b) as string).getTime())[0] ?? null;
-  }, [dashboard]);
-
   async function changeScope(next: Scope) {
     const url = new URL(window.location.href);
     url.searchParams.set('scope', next);
@@ -1184,7 +1177,7 @@ function Panel() {
           </section>}
           <div className={loading && dashboard ? 'view-content scope-loading' : 'view-content'} aria-busy={loading && Boolean(dashboard)} inert={loading && Boolean(dashboard)}>
             {dashboard && tab === 'overview' && (
-              <Overview dashboard={dashboard} pending={activePending} upcoming={upcoming} onInspect={openItemDetail} onOpenDay={openDayDetail} onPrepare={openAction} onRetry={handleAffairRetry} onRetryPrev={handleAffairRetryPrev} retryingId={quickBusyId} affairFeedback={affairFeedback} onDayComplete={handleDayComplete} dayBusy={dayCompleteBusy} dayFeedback={dayCompleteFeedback} onNavigate={navigateWithSection} onQuick={handleQuick} onAskAi={openAiWithDraft} onDataChanged={refreshCurrent} />
+              <Overview dashboard={dashboard} pending={activePending} onInspect={openItemDetail} onOpenDay={openDayDetail} onPrepare={openAction} onRetry={handleAffairRetry} onRetryPrev={handleAffairRetryPrev} retryingId={quickBusyId} affairFeedback={affairFeedback} onDayComplete={handleDayComplete} dayBusy={dayCompleteBusy} dayFeedback={dayCompleteFeedback} onNavigate={navigateWithSection} onQuick={handleQuick} onAskAi={openAiWithDraft} onDataChanged={refreshCurrent} />
             )}
             {tab === 'planning' && <PlanningView onAction={openAction} onAskAi={openAiWithDraft} refreshKey={planningRevision} sectionHint={planningSectionHint} scheduleText={dashboard?.scheduleText} onDataChanged={refreshCurrent} />}
             {tab === 'affairs' && <AffairsView onQuick={handleQuick} onAskAi={openAiWithDraft} onPrepare={openAction} onInspect={openItemDetail} onRetry={handleAffairRetry} onRetryPrev={handleAffairRetryPrev} retryingId={quickBusyId} feedback={affairFeedback} refreshKey={planningRevision} observedAt={dashboard?.observedAt ?? ''} onOpenDay={(date, items, trigger) => openDayDetail(date, trigger, items)} localDate={dashboard?.localDate} />}
@@ -1247,10 +1240,9 @@ function Panel() {
   );
 }
 
-function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepare, onQuick, onAskAi, onRetry, onRetryPrev, retryingId, affairFeedback, onDayComplete, dayBusy, dayFeedback, onNavigate, onDataChanged }: {
+function Overview({ dashboard, pending, onInspect, onOpenDay, onPrepare, onQuick, onAskAi, onRetry, onRetryPrev, retryingId, affairFeedback, onDayComplete, dayBusy, dayFeedback, onNavigate, onDataChanged }: {
   dashboard: Dashboard;
   pending: TimelineItem[];
-  upcoming: TimelineItem | null;
   onInspect: InspectHandler;
   onOpenDay: OpenDayHandler;
   onPrepare: (preset: ActionPreset) => void;
@@ -1297,10 +1289,27 @@ function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepar
   return (
     <div className="view-stack">
       <PageTitle
-        eyebrow={`${dashboard.localDate} · ${scopeLabels[dashboard.scope]}`}
+        eyebrow={`课务总览 · ${scopeLabels[dashboard.scope]}`}
         title={headline}
-        description="数据来自排课与事务系统实时回读。"
+        description="先看下一步，再处理欠账，最后看完整安排。"
       />
+
+      <NextCourseBanner course={dashboard.nextCourse || null} advice={dashboard.commuteAdvice || null} onOpen={(trigger) => dashboard.nextCourse && onInspect(dashboard.nextCourse, trigger)} onQuick={onQuick} onAskAi={onAskAi} />
+
+      {dashboard.scope === 'today' && ((pendingToday.length > 0 && dayEnded) || dayFeedback) && <section className="day-complete-bar">
+        <div>
+          <p className="eyebrow">今日收课</p>
+          <strong>{pendingToday.length ? `还有 ${pendingToday.length} 节待记录` : '今日课程已全部记录'}</strong>
+          <span>提交后会写入本地课表并同步日历</span>
+          {dayFeedback && <InlineResult ok={dayFeedback.ok} text={dayFeedback.text} />}
+        </div>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={dayButtonDisabled}
+          onClick={() => void onDayComplete(dashboard.localDate)}
+        >{dayButtonLabel}</button>
+      </section>}
 
       <SuggestionCards
         observedAt={dashboard.observedAt}
@@ -1317,33 +1326,6 @@ function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepar
         affairFeedback={affairFeedback}
         onDataChanged={onDataChanged}
       />
-
-
-
-
-
-
-<NextCourseBanner course={dashboard.nextCourse || null} advice={dashboard.commuteAdvice || null} onOpen={(trigger) => dashboard.nextCourse && onInspect(dashboard.nextCourse, trigger)} onPrepare={onPrepare} onQuick={onQuick} onAskAi={onAskAi} />
-      {dashboard.scope === 'today' && todayCourses.length > 0 && <section className="day-complete-bar">
-        <div>
-          <p className="eyebrow">今日收课</p>
-          <strong>{pendingToday.length ? `还有 ${pendingToday.length} 节待记录` : '今日课程已全部记录'}</strong>
-          <span>{pendingToday.length && !dayEnded ? `最后一节 ${formatTime(finalEnd)} 结束后可操作` : '提交后会写入本地课表并同步日历'}</span>
-          {dayFeedback && <InlineResult ok={dayFeedback.ok} text={dayFeedback.text} />}
-        </div>
-        <button
-          type="button"
-          className="primary-button"
-          disabled={dayButtonDisabled}
-          onClick={() => void onDayComplete(dashboard.localDate)}
-        >{dayButtonLabel}</button>
-      </section>}
-      <section className="metrics-grid">
-        <Metric label="课程" value={dashboard.courses.length} hint={formatRange(dashboard.range)} tone="sage" />
-        <Metric label="待办" value={pending.length} hint={pending[0]?.title || '没有积压'} tone="amber" />
-        <Metric label="下一项" value={upcoming ? formatTime(itemDate(upcoming)) || '待定' : '无'} hint={upcoming?.title || '当前范围内已清空'} tone="blue" />
-        <Metric label="系统" value={dashboard.health?.ok ? '正常' : '异常'} hint={`活动事务 ${dashboard.health?.database?.verification?.counts?.active ?? '—'}`} tone="ink" />
-      </section>
         <div className={dashboard.scope === 'week' || dashboard.scope === 'month' ? 'panel wide calendar-panel' : 'panel wide'}>
           <PanelHeading
             title={dashboard.scope === 'week' ? '周视图' : dashboard.scope === 'month' ? '月视图' : '时间轴'}
@@ -1504,7 +1486,6 @@ function SuggestionCards({ observedAt, pending, onInspect, onPrepare, onOpenDay,
   const pendingItems = pending.filter((item) => !requiredEntityIds.has(item.id));
   const suggestionCards = allCards.filter((card) => card.bucket === 'suggestion' && !dismissed.includes(card.id));
   const requiredCount = pendingItems.length + requiredCards.length;
-  const layoutClass = `overview-duo${requiredCount ? '' : ' pending-empty'}${suggestionCards.length ? '' : ' suggestions-empty'}`;
 
   function renderCard(card: SuggestionCard, dismissible: boolean) {
     const toneValue = card.bucket === 'required'
@@ -1544,20 +1525,25 @@ function SuggestionCards({ observedAt, pending, onInspect, onPrepare, onOpenDay,
     );
   }
 
+  if (!requiredCount && !suggestionCards.length) return null;
+  if (!requiredCount) {
+    return <section className="panel suggestion-action-panel" aria-label="建议处理">
+      <PanelHeading title="建议处理" meta={`${suggestionCards.length} 项`} />
+      <div>{suggestionCards.map((card) => renderCard(card, true))}</div>
+    </section>;
+  }
   return (
-    <div className={layoutClass}>
-      <section className="panel pending-action-panel" aria-label="待处理">
-        <PanelHeading title="待处理" meta={`${requiredCount} 项`} />
-        {requiredCount ? <div>
-          {requiredCards.map((card) => renderCard(card, false))}
-          {pendingItems.map((item) => <QuickPendingItem key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} onRetryPrev={onRetryPrev} retryingId={retryingId} feedback={affairFeedback[item.id]} />)}
-        </div> : <Empty title="没有待处理事项" text="当前没有欠你决定或补记的事情。" compact />}
-      </section>
-      {suggestionCards.length > 0 && <section className="panel suggestion-action-panel" aria-label="建议处理">
-        <PanelHeading title="建议处理" meta={`${suggestionCards.length} 项`} />
+    <section className="panel pending-action-panel action-center" aria-label="待处理">
+      <PanelHeading title="待处理" meta={`${requiredCount} 项`} />
+      <div>
+        {requiredCards.map((card) => renderCard(card, false))}
+        {pendingItems.map((item) => <QuickPendingItem key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} onRetryPrev={onRetryPrev} retryingId={retryingId} feedback={affairFeedback[item.id]} />)}
+      </div>
+      {suggestionCards.length > 0 && <details className="action-suggestions">
+        <summary><strong>系统建议</strong><span>{suggestionCards.length} 项可选优化</span></summary>
         <div>{suggestionCards.map((card) => renderCard(card, true))}</div>
-      </section>}
-    </div>
+      </details>}
+    </section>
   );
 }
 
@@ -3556,10 +3542,8 @@ function SystemView({ dashboard, onSync, embedded = false }: { dashboard: Dashbo
   );
 }
 
-function NextCourseBanner({ course, advice, onOpen, onPrepare, onQuick, onAskAi }: { course: TimelineItem | null; advice: Dashboard['commuteAdvice']; onOpen: (trigger: HTMLElement) => void; onPrepare: (preset: ActionPreset) => void; onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void; onAskAi?: (draft: string) => void }) {
-  if (!course) {
-    return <section className="next-course-banner empty-next"><div><p className="eyebrow">下一节课</p><h3>未来范围内没有课程</h3></div></section>;
-  }
+function NextCourseBanner({ course, advice, onOpen, onQuick, onAskAi }: { course: TimelineItem | null; advice: Dashboard['commuteAdvice']; onOpen: (trigger: HTMLElement) => void; onQuick?: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void; onAskAi?: (draft: string) => void }) {
+  if (!course) return null;
   return (
     <section
       className={`next-course-banner next-course-open contextual-action-host ${itemStateClass(course)}${isTemporaryItem(course) ? ' temporary' : ''} actionable`}

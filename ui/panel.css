@@ -1814,11 +1814,14 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
 .calendar-diff-row { background: color-mix(in srgb, var(--wb-state-error) 8%, transparent); color: var(--wb-text); }
 .version-row { border-bottom-color: var(--wb-border); }
 
-/* ── 总览：功能双块置顶（窄屏纵向堆叠），课表主体在下 ── */
-.overview-duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; align-items: start; }
-@media (max-width: 900px) {
-  .overview-duo { grid-template-columns: 1fr; }
-}
+/* ── 总览行动中心：必做事项直接展示，可选建议降到同块折叠层 ── */
+.action-center { display: grid; gap: 10px; }
+.action-suggestions { border-radius: 11px; background: color-mix(in srgb, var(--wb-accent) 4%, transparent); }
+.action-suggestions > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; cursor: pointer; list-style: none; }
+.action-suggestions > summary::-webkit-details-marker { display: none; }
+.action-suggestions > summary strong { font-size: 11px; }
+.action-suggestions > summary span { color: var(--wb-muted); font-size: 10px; }
+.action-suggestions[open] > summary { margin-bottom: 2px; }
 
 /* ── 按钮彻底无线化：全站按钮去掉边框与系统外观，只留底色/文字层级 ── */
 .workbench-shell button { appearance: none; border: 0; box-shadow: none; }
@@ -1843,7 +1846,4 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
 .quick-pending-item button.quiet-danger:hover { color: var(--wb-state-error); }
 .quick-pending-item button:is(.primary, .secondary):hover { background: color-mix(in srgb, var(--wb-accent) 20%, var(--wb-card)); }
 
-/* ── 行动队列布局：没有建议时待处理独占整行；仅待处理为空时建议区获得更多空间 ── */
-.pending-action-panel .empty.compact { padding: 10px 12px; }
-.overview-duo.pending-empty { grid-template-columns: minmax(0, 0.9fr) minmax(0, 2fr); }
-.overview-duo.suggestions-empty { grid-template-columns: minmax(0, 1fr); }
+/* 空队列不渲染功能块；建议单独出现时保持一块，不与待处理伪装成并列主任务。 */

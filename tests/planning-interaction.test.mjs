@@ -127,14 +127,22 @@ test('reservation actions update locally and refresh all data without blocking t
   assert.match(panel, /if \(!silent\) \{\s*setLoading\(true\)/);
 });
 
-test('overview separates required work from optional suggestions without duplicate hiding', () => {
+test('overview keeps three levels: next action, required work, full schedule', () => {
   assert.match(panel, /const requiredCards = allCards\.filter\(\(card\) => card\.bucket === 'required'\)/);
   assert.match(panel, /const suggestionCards = allCards\.filter\(\(card\) => card\.bucket === 'suggestion'/);
   assert.match(panel, /const pendingItems = pending\.filter\(\(item\) => !requiredEntityIds\.has\(item\.id\)\)/);
   assert.match(panel, /const requiredCount = pendingItems\.length \+ requiredCards\.length/);
+  assert.match(panel, /if \(!requiredCount && !suggestionCards\.length\) return null/);
+  assert.match(panel, /className="panel pending-action-panel action-center"/);
+  assert.match(panel, /<details className="action-suggestions">/);
   assert.match(panel, /requiredCards\.map\(\(card\) => renderCard\(card, false\)\)/);
   assert.match(panel, /suggestionCards\.map\(\(card\) => renderCard\(card, true\)\)/);
   assert.doesNotMatch(panel, /pending\.slice\(0, 4\)/);
+  assert.doesNotMatch(panel, /<Metric label="待办"/);
+  assert.doesNotMatch(panel, /<Metric label="下一项"/);
+  assert.match(panel, /if \(!course\) return null/);
+  assert.doesNotMatch(panel, /未来范围内没有课程/);
+  assert.ok(panel.indexOf('<NextCourseBanner') < panel.indexOf('<SuggestionCards'));
 });
 
 test('affair records separate scheduled work from completed history', () => {
