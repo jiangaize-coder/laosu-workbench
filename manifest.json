@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "id": "laosu-workbench",
   "name": "课务台",
-  "version": "2.12.0",
+  "version": "2.12.1",
   "description": "排课、事务、提醒与飞书同步的 Hana 全屏工作台和 Agent 工具。",
   "minAppVersion": "0.333.0",
   "trust": "full-access",

@@ -23,7 +23,7 @@ export default function registerPluginUiRoutes(app, ctx) {
       const scope = c.req.query("scope") || "week";
       const fresh = c.req.query("fresh") === "1";
       if (fresh) invalidateAllSnapshots();
-      return c.json(await withSnapshot(`dashboard:${scope}`, () => getDashboard(scope), { fresh }));
+      return c.json(await withSnapshot(`dashboard:${scope}`, () => getDashboard(scope, ctx.dataDir), { fresh }));
     } catch (error) {
       ctx.log.error("dashboard failed", error);
       return c.json({ ok: false, error: error.message }, 500);
@@ -111,7 +111,7 @@ export default function registerPluginUiRoutes(app, ctx) {
 
   app.get("/api/calendar-health", async (c) => {
     try {
-      return c.json(await getCalendarHealth());
+      return c.json(await getCalendarHealth(ctx.dataDir));
     } catch (error) {
       ctx.log.error("calendar health failed", error);
       return c.json({ ok: false, error: error.message }, 500);

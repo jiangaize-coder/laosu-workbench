@@ -1,6 +1,6 @@
 {
   "name": "laosu-workbench",
-  "version": "2.12.0",
+  "version": "2.12.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -19,7 +19,7 @@
     "typecheck:ui": "tsc --noEmit",
     "typecheck:backend": "tsc -p tsconfig.backend.json",
     "typecheck": "npm run typecheck:ui && npm run typecheck:backend",
-    "check:js": "node --check index.js && node --check lib/backend.js && node --check lib/operations.js && node --check lib/snapshot-cache.js && node --check lib/rerun-queue.js && node --check routes/ui.js && node --check tools/get-dashboard.js && node --check tools/preview-change.js && node --check tools/commit-preview.js",
+    "check:js": "node --check index.js && node --check lib/backend.js && node --check lib/background-lease.js && node --check lib/operations.js && node --check lib/snapshot-cache.js && node --check lib/rerun-queue.js && node --check routes/ui.js && node --check tools/get-dashboard.js && node --check tools/preview-change.js && node --check tools/commit-preview.js",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "verify": "npm run typecheck && npm run check:js && npm test && npm run build:ui",
     "release:verify": "npm run verify && node scripts/release-verify.mjs",

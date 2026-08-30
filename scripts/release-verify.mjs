@@ -15,7 +15,7 @@ const failures = [];
 if (manifest.version !== pkg.version) failures.push('manifest.json 与 package.json 版本不一致');
 if (lock.version !== pkg.version || lock.packages?.['']?.version !== pkg.version) failures.push('package-lock.json 版本不一致');
 if (!readme.includes(`当前版本：v${pkg.version}`)) failures.push('README 当前版本不一致');
-for (const file of ['assets/panel.js', 'assets/panel.css', 'index.js', 'lib/backend.js', 'routes/ui.js', 'ui/design-system.css']) {
+for (const file of ['assets/panel.js', 'assets/panel.css', 'index.js', 'lib/backend.js', 'lib/background-lease.js', 'routes/ui.js', 'ui/design-system.css', 'scripts/release.mjs']) {
   if (!fs.existsSync(path.join(root, file))) failures.push(`缺少发布文件：${file}`);
 }
 const routes = read('routes/ui.js').toString('utf8');
@@ -34,6 +34,6 @@ if (failures.length) {
   process.exit(1);
 }
 
-const critical = ['manifest.json', 'package.json', 'package-lock.json', 'index.js', 'lib/backend.js', 'routes/ui.js', 'assets/panel.js', 'assets/panel.css'];
+const critical = ['manifest.json', 'package.json', 'package-lock.json', 'index.js', 'lib/backend.js', 'lib/background-lease.js', 'routes/ui.js', 'scripts/release.mjs', 'assets/panel.js', 'assets/panel.css'];
 const hashes = Object.fromEntries(critical.map((file) => [file, crypto.createHash('sha256').update(read(file)).digest('hex')]));
 console.log(JSON.stringify({ ok: true, version: pkg.version, hashes }, null, 2));
