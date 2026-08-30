@@ -14,6 +14,9 @@ type Tab = 'overview' | 'planning' | 'affairs';
 type PlanningSection = 'calendar' | 'trial' | 'students' | 'candidates';
 type SuggestionCard = {
   id: string;
+  entityId?: string;
+  bucket: 'required' | 'suggestion';
+  rank: number;
   tone: 'urgent' | 'warn' | 'info';
   title: string;
   detail: string;
@@ -414,7 +417,7 @@ function statusTone(status: string) {
   if (['completed', '已完成'].includes(status)) return 'finished';
   if (['cancelled', '已取消', '已调课'].includes(status)) return 'muted';
   if (['failed', 'error', 'blocked', '异常', '失败'].includes(status)) return 'error';
-  if (['pending_confirmation', '待确认', 'needs_reschedule'].includes(status)) return 'warn';
+  if (['pending_confirmation', '待确认', '待处理', 'needs_reschedule'].includes(status)) return 'warn';
   return 'active';
 }
 
@@ -1299,13 +1302,21 @@ function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepar
         description="数据来自排课与事务系统实时回读。"
       />
 
-      <div className={pending.length ? 'overview-duo' : 'overview-duo pending-empty'}>
-          <div className="panel pending-action-panel">
-            <PanelHeading title="待处理" meta={`${pending.length} 项`} />
-            {pending.length ? pending.slice(0, 4).map((item) => <QuickPendingItem key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} onRetryPrev={onRetryPrev} retryingId={retryingId} feedback={affairFeedback[item.id]} />) : <Empty title="没有待处理事务" text="当前队列是干净的。" compact />}
-          </div>
-          <SuggestionCards observedAt={dashboard.observedAt} onPrepare={onPrepare} onOpenDay={onOpenDay} onNavigate={onNavigate} onRetry={onRetry} onDataChanged={onDataChanged} />
-      </div>
+      <SuggestionCards
+        observedAt={dashboard.observedAt}
+        pending={pending}
+        onInspect={onInspect}
+        onPrepare={onPrepare}
+        onOpenDay={onOpenDay}
+        onNavigate={onNavigate}
+        onQuick={onQuick}
+        onAskAi={onAskAi}
+        onRetry={onRetry}
+        onRetryPrev={onRetryPrev}
+        retryingId={retryingId}
+        affairFeedback={affairFeedback}
+        onDataChanged={onDataChanged}
+      />
 
 
 
@@ -1367,12 +1378,19 @@ function Overview({ dashboard, pending, upcoming, onInspect, onOpenDay, onPrepar
   );
 }
 
-function SuggestionCards({ observedAt, onPrepare, onOpenDay, onNavigate, onRetry, onDataChanged }: {
+function SuggestionCards({ observedAt, pending, onInspect, onPrepare, onOpenDay, onNavigate, onQuick, onAskAi, onRetry, onRetryPrev, retryingId, affairFeedback, onDataChanged }: {
   observedAt: string;
+  pending: TimelineItem[];
+  onInspect: InspectHandler;
   onPrepare: (preset: ActionPreset) => void;
   onOpenDay: (date: string, trigger?: HTMLElement | null) => void;
   onNavigate: (tab: Tab, section?: string) => void;
+  onQuick: (action: 'courseCancel' | 'affairComplete', item: TimelineItem) => void;
+  onAskAi: (draft: string) => void;
   onRetry: (item: TimelineItem) => Promise<void>;
+  onRetryPrev?: (item: TimelineItem) => Promise<void>;
+  retryingId: string | null;
+  affairFeedback: Record<string, AffairFeedback>;
   onDataChanged?: (options?: { silent?: boolean }) => Promise<unknown>;
 }) {
   const [data, setData] = useState<{ cards: SuggestionCard[] } | null>(() => readWorkbenchCache<{ cards: SuggestionCard[] }>('suggestions'));
@@ -1480,49 +1498,66 @@ function SuggestionCards({ observedAt, onPrepare, onOpenDay, onNavigate, onRetry
     }
   }
 
-  const cards = (data?.cards ?? []).filter((card) => !dismissed.includes(card.id));
-  if (!cards.length) return null;
-  return (
-    <section className="panel" aria-label="建议处理">
-      <PanelHeading title="建议处理" meta={`${cards.length} 项`} />
-      <div>
-        {cards.map((card) => {
-          const toneValue = card.tone === 'urgent' ? '异常' : card.tone === 'warn' ? '待确认' : 'scheduled';
-          return (
-            <div className="quick-pending-item contextual-action-host actionable action-open" key={card.id}>
-              <div className="quick-pending-main">
-                <strong>{card.title}</strong>
-                <span>{card.detail}</span>
-                {results[card.id] && <InlineResult ok={results[card.id].ok} text={results[card.id].text} />}
-              </div>
-              <div className="quick-pending-actions"><Status value={toneValue} /></div>
-              <div className="quick-pending-inline-action">
-                {card.action.kind === 'overdue' && <>
-                  <button type="button" className="primary" disabled={busyId === card.id} onClick={() => void runCard(card, 'done')}>{busyId === card.id ? '处理中…' : card.action.label}</button>
-                  <button type="button" className="secondary" disabled={Boolean(busyId)} onClick={() => void runCard(card, 'cancelled')}>{card.action.cancelLabel || '没上'}</button>
-                </>}
-                {card.action.kind === 'backfill' && <button type="button" className="primary" disabled={Boolean(busyId)} onClick={() => void runBackfill(card)}>{busyId === card.id ? '处理中…' : card.action.label}</button>}
-                {card.action.kind === 'preview' && <button type="button" className="primary" disabled={Boolean(busyId)} onClick={() => {
-                  const operation = card.action.operation;
-                  if (operation === 'calendar_sync' || operation === 'quarantine_overdue') {
-                    void runCard(card);
-                    return;
-                  }
-                  onPrepare({ operation: operation ?? '', ...(card.action.input ?? {}) });
-                }}>{busyId === card.id ? '处理中…' : card.action.label}</button>}
-                {card.action.kind === 'retryNext' && <button type="button" className="secondary" disabled={Boolean(busyId)} onClick={() => {
-                  const item: TimelineItem = { id: card.action.id ?? '', version: card.action.version, retry: {}, domain: 'affair', title: card.action.title ?? card.title, status: 'pending_confirmation' };
-                  void onRetry(item);
-                }}>{card.action.label}</button>}
-                {card.action.kind === 'openDay' && <button type="button" className="secondary" disabled={Boolean(busyId)} onClick={(event) => onOpenDay(card.action.date ?? '', event.currentTarget)}>{card.action.label}</button>}
-                {card.action.kind === 'navigate' && <button type="button" className="secondary" disabled={Boolean(busyId)} onClick={() => onNavigate((card.action.tab ?? 'planning') as Tab, card.action.section)}>{card.action.label}</button>}
-                <button type="button" className="quiet-danger" onClick={() => dismiss(card.id)}>收起</button>
-              </div>
-            </div>
-          );
-        })}
+  const allCards = data?.cards ?? [];
+  const requiredCards = allCards.filter((card) => card.bucket === 'required');
+  const requiredEntityIds = new Set(requiredCards.map((card) => card.entityId).filter(Boolean));
+  const pendingItems = pending.filter((item) => !requiredEntityIds.has(item.id));
+  const suggestionCards = allCards.filter((card) => card.bucket === 'suggestion' && !dismissed.includes(card.id));
+  const requiredCount = pendingItems.length + requiredCards.length;
+  const layoutClass = `overview-duo${requiredCount ? '' : ' pending-empty'}${suggestionCards.length ? '' : ' suggestions-empty'}`;
+
+  function renderCard(card: SuggestionCard, dismissible: boolean) {
+    const toneValue = card.bucket === 'required'
+      ? card.tone === 'urgent' ? '待处理' : '待确认'
+      : '建议';
+    return (
+      <div className={`quick-pending-item contextual-action-host actionable action-open ${card.bucket}`} key={card.id}>
+        <div className="quick-pending-main">
+          <strong>{card.title}</strong>
+          <span>{card.detail}</span>
+          {results[card.id] && <InlineResult ok={results[card.id].ok} text={results[card.id].text} />}
+        </div>
+        <div className="quick-pending-actions"><Status value={toneValue} /></div>
+        <div className="quick-pending-inline-action">
+          {card.action.kind === 'overdue' && <>
+            <button type="button" className="primary" disabled={busyId === card.id} onClick={() => void runCard(card, 'done')}>{busyId === card.id ? '处理中…' : card.action.label}</button>
+            <button type="button" className="secondary" disabled={Boolean(busyId)} onClick={() => void runCard(card, 'cancelled')}>{card.action.cancelLabel || '没上'}</button>
+          </>}
+          {card.action.kind === 'backfill' && <button type="button" className="primary" disabled={Boolean(busyId)} onClick={() => void runBackfill(card)}>{busyId === card.id ? '处理中…' : card.action.label}</button>}
+          {card.action.kind === 'preview' && <button type="button" className="primary" disabled={Boolean(busyId)} onClick={() => {
+            const operation = card.action.operation;
+            if (operation === 'calendar_sync' || operation === 'quarantine_overdue') {
+              void runCard(card);
+              return;
+            }
+            onPrepare({ operation: operation ?? '', ...(card.action.input ?? {}) });
+          }}>{busyId === card.id ? '处理中…' : card.action.label}</button>}
+          {card.action.kind === 'retryNext' && <button type="button" className="secondary" disabled={Boolean(busyId)} onClick={() => {
+            const item: TimelineItem = { id: card.action.id ?? '', version: card.action.version, retry: {}, domain: 'affair', title: card.action.title ?? card.title, status: 'pending_confirmation' };
+            void onRetry(item);
+          }}>{card.action.label}</button>}
+          {card.action.kind === 'openDay' && <button type="button" className="secondary" disabled={Boolean(busyId)} onClick={(event) => onOpenDay(card.action.date ?? '', event.currentTarget)}>{card.action.label}</button>}
+          {card.action.kind === 'navigate' && <button type="button" className="secondary" disabled={Boolean(busyId)} onClick={() => onNavigate((card.action.tab ?? 'planning') as Tab, card.action.section)}>{card.action.label}</button>}
+          {dismissible && <button type="button" className="quiet-danger" onClick={() => dismiss(card.id)}>收起</button>}
+        </div>
       </div>
-    </section>
+    );
+  }
+
+  return (
+    <div className={layoutClass}>
+      <section className="panel pending-action-panel" aria-label="待处理">
+        <PanelHeading title="待处理" meta={`${requiredCount} 项`} />
+        {requiredCount ? <div>
+          {requiredCards.map((card) => renderCard(card, false))}
+          {pendingItems.map((item) => <QuickPendingItem key={item.id} item={item} onInspect={onInspect} onPrepare={onPrepare} onQuick={onQuick} onAskAi={onAskAi} onRetry={onRetry} onRetryPrev={onRetryPrev} retryingId={retryingId} feedback={affairFeedback[item.id]} />)}
+        </div> : <Empty title="没有待处理事项" text="当前没有欠你决定或补记的事情。" compact />}
+      </section>
+      {suggestionCards.length > 0 && <section className="panel suggestion-action-panel" aria-label="建议处理">
+        <PanelHeading title="建议处理" meta={`${suggestionCards.length} 项`} />
+        <div>{suggestionCards.map((card) => renderCard(card, true))}</div>
+      </section>}
+    </div>
   );
 }
 

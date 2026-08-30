@@ -273,6 +273,10 @@
 .item-action-buttons button,
 .planning-week-inline-action button { min-height: var(--wb-control-compact); }
 
+/* 待处理是明确欠账，用琥珀浓度；建议处理是可选优化，用低浓度鼠尾草绿。 */
+.quick-pending-item.required { background: color-mix(in srgb, var(--wb-state-pending) 7%, transparent); }
+.quick-pending-item.suggestion { background: color-mix(in srgb, var(--wb-brand) 5%, transparent); }
+
 /* 建议处理属于轻量决策，统一为浅绿章；“收起”保持幽灵文字。 */
 .quick-pending-item button:is(.primary, .secondary) {
   background: color-mix(in srgb, var(--wb-brand) 13%, var(--wb-card));

@@ -127,6 +127,16 @@ test('reservation actions update locally and refresh all data without blocking t
   assert.match(panel, /if \(!silent\) \{\s*setLoading\(true\)/);
 });
 
+test('overview separates required work from optional suggestions without duplicate hiding', () => {
+  assert.match(panel, /const requiredCards = allCards\.filter\(\(card\) => card\.bucket === 'required'\)/);
+  assert.match(panel, /const suggestionCards = allCards\.filter\(\(card\) => card\.bucket === 'suggestion'/);
+  assert.match(panel, /const pendingItems = pending\.filter\(\(item\) => !requiredEntityIds\.has\(item\.id\)\)/);
+  assert.match(panel, /const requiredCount = pendingItems\.length \+ requiredCards\.length/);
+  assert.match(panel, /requiredCards\.map\(\(card\) => renderCard\(card, false\)\)/);
+  assert.match(panel, /suggestionCards\.map\(\(card\) => renderCard\(card, true\)\)/);
+  assert.doesNotMatch(panel, /pending\.slice\(0, 4\)/);
+});
+
 test('affair records separate scheduled work from completed history', () => {
   assert.match(panel, /const scheduledAffairs = affairs/);
   assert.match(panel, /const closedAffairs = affairs/);

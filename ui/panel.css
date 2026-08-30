@@ -1843,6 +1843,7 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
 .quick-pending-item button.quiet-danger:hover { color: var(--wb-state-error); }
 .quick-pending-item button:is(.primary, .secondary):hover { background: color-mix(in srgb, var(--wb-accent) 20%, var(--wb-card)); }
 
-/* ── 空状态瘦身：待处理为空时不再占半屏 ── */
+/* ── 行动队列布局：没有建议时待处理独占整行；仅待处理为空时建议区获得更多空间 ── */
 .pending-action-panel .empty.compact { padding: 10px 12px; }
 .overview-duo.pending-empty { grid-template-columns: minmax(0, 0.9fr) minmax(0, 2fr); }
+.overview-duo.suggestions-empty { grid-template-columns: minmax(0, 1fr); }
