@@ -40,6 +40,15 @@ test('primary week and month schedule is read-only while AI keeps operation capa
   assert.doesNotMatch(contextCard, /本次不上|调时间|取消…|affairComplete/);
 });
 
+test('month day drawer fits about eight to nine compact people cards without changing month cells', () => {
+  assert.match(panel, /view\.kind === 'day' \? 'context-item-list context-day-list'/);
+  assert.match(panel, /dayItems\.slice\(0, 3\)/);
+  assert.match(css, /\.context-day-list \{ gap: 5px; \}/);
+  assert.match(css, /\.context-day-list \.context-item-card \{ min-height: 48px; padding: 7px 10px;/);
+  assert.match(css, /\.context-day-list \.context-item-card p \{ display: none; \}/);
+  assert.match(css, /\.context-day-list \.context-item-card h3[^}]*white-space: nowrap;/);
+});
+
 test('refreshing content is inert and custom buttons prevent Space from scrolling', () => {
   assert.match(panel, /inert=\{loading && Boolean\(dashboard\)\}/);
   const customButtons = panel.match(/\srole="button"/g) || [];

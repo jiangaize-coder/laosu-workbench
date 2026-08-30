@@ -3269,7 +3269,7 @@ function ContextDrawerContent({ view, dashboard }: { view: ContextView; dashboar
       : dashboard.items.filter((item) => itemDateKey(item) === view.date).sort((a, b) => String(itemDate(a) || '').localeCompare(String(itemDate(b) || ''))))
     : [view.item];
   if (!items.length) return <Empty title="当天没有安排" text="当前时间范围内没有课程或事务。" />;
-  return <div className="context-item-list">
+  return <div className={view.kind === 'day' ? 'context-item-list context-day-list' : 'context-item-list'}>
     {items.map((item) => <ContextItemCard key={item.id} item={item} />)}
   </div>;
 }

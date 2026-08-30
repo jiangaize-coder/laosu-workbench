@@ -1121,6 +1121,16 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
 .context-domain.affair { color: #a36f2f; background: color-mix(in srgb, #b88642 13%, transparent); }
 .context-item-card h3 { margin: 13px 0 0; font-size: 17px; }
 .context-item-card p { margin: 6px 0 0; color: var(--wb-muted); font-size: 11px; line-height: 1.55; }
+/* 月视图点开某一天：一屏容纳约 8–9 人；单项详情仍使用完整卡片。 */
+.context-day-list { gap: 5px; }
+.context-day-list .context-item-card { min-height: 48px; padding: 7px 10px; border-radius: 9px; }
+.context-day-list .context-item-card > header { align-items: center; }
+.context-day-list .context-item-card > header > div { min-width: 0; flex-wrap: nowrap; gap: 6px; }
+.context-day-list .context-domain { flex: 0 0 auto; padding: 2px 6px; font-size: 8px; }
+.context-day-list .context-item-card time { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
+.context-day-list .context-item-card h3 { margin: 4px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; line-height: 1.25; }
+.context-day-list .context-item-card p { display: none; }
+.context-day-list .status { flex: 0 0 auto; padding: 3px 6px; font-size: 8.5px; }
 .context-item-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
 .context-item-actions .primary-button,
 .context-item-actions .row-action-button { min-height: 34px; }

@@ -13558,7 +13558,7 @@ function ig({ initialDraft: c, preview: f, busy: d, onPreview: o, onCommit: E, o
 function ug({ view: c, dashboard: f }) {
   if (c.kind === "system") return /* @__PURE__ */ i.jsx(og, { dashboard: f, embedded: !0, readOnly: !0 });
   const d = c.kind === "day" ? c.items ? [...c.items].sort((o, E) => String(vt(o) || "").localeCompare(String(vt(E) || ""))) : f.items.filter((o) => fi(o) === c.date).sort((o, E) => String(vt(o) || "").localeCompare(String(vt(E) || ""))) : [c.item];
-  return d.length ? /* @__PURE__ */ i.jsx("div", { className: "context-item-list", children: d.map((o) => /* @__PURE__ */ i.jsx(cg, { item: o }, o.id)) }) : /* @__PURE__ */ i.jsx(nl, { title: "当天没有安排", text: "当前时间范围内没有课程或事务。" });
+  return d.length ? /* @__PURE__ */ i.jsx("div", { className: c.kind === "day" ? "context-item-list context-day-list" : "context-item-list", children: d.map((o) => /* @__PURE__ */ i.jsx(cg, { item: o }, o.id)) }) : /* @__PURE__ */ i.jsx(nl, { title: "当天没有安排", text: "当前时间范围内没有课程或事务。" });
 }
 function cg({ item: c }) {
   const f = vt(c);
