@@ -11759,9 +11759,12 @@ function Gy() {
           /* @__PURE__ */ i.jsx("i", {}),
           W?.health?.ok ? "系统正常" : "需要检查"
         ] }),
-        /* @__PURE__ */ i.jsx("button", { type: "button", className: "ghost-button refresh-local-button", "data-ui-role": "button", "data-ui-variant": "secondary", "data-ui-id": "refresh-workbench", onClick: () => {
+        /* @__PURE__ */ i.jsxs("button", { type: "button", className: "ghost-button refresh-local-button", "data-ui-role": "button", "data-ui-variant": "secondary", "data-ui-id": "refresh-workbench", onClick: () => {
           Oa();
-        }, "aria-label": "刷新本地数据", disabled: ge, children: "↻ 刷新本地数据" })
+        }, "aria-label": "刷新本地数据", disabled: ge, children: [
+          /* @__PURE__ */ i.jsx("span", { "aria-hidden": "true", children: "↻" }),
+          /* @__PURE__ */ i.jsx("span", { className: "refresh-local-label", children: "刷新本地数据" })
+        ] })
       ] })
     ] }),
     /* @__PURE__ */ i.jsxs("main", { className: "main-area scalable-main", style: { zoom: Q, width: `${100 / Q}%` }, children: [
@@ -11942,7 +11945,7 @@ function $y({ items: c, range: f, localDate: d, onInspect: o }) {
       V.set(ie, fr(ae));
     }
     return V;
-  }, [q, E]), p = "44px repeat(7, minmax(0, 1fr))", U = c.filter((V) => V.start_at || V.deadline_at), { startHour: A, endHour: S } = Rh(U), L = 64, Q = (S - A) * L, de = Array.from({ length: S - A + 1 }, (V, ie) => A + ie);
+  }, [q, E]), p = "36px repeat(7, minmax(0, 1fr))", U = c.filter((V) => V.start_at || V.deadline_at), { startHour: A, endHour: S } = Rh(U), L = 60, Q = (S - A) * L, de = Array.from({ length: S - A + 1 }, (V, ie) => A + ie);
   return /* @__PURE__ */ i.jsx("div", { className: "week-calendar-scroll draggable-week-scroll", role: "region", tabIndex: 0, "aria-label": "七列周时间视图", ...j, children: /* @__PURE__ */ i.jsxs("div", { className: "week-calendar-canvas", style: { minWidth: 0 }, children: [
     /* @__PURE__ */ i.jsxs("div", { className: "week-calendar-header", style: { gridTemplateColumns: p }, children: [
       /* @__PURE__ */ i.jsx("div", { className: "week-corner", children: "时间" }),

@@ -1182,7 +1182,7 @@ function Panel() {
             <button type="button" className={`${dashboard?.health?.ok ? 'health good' : 'health bad'} health-button${contextView?.kind === 'system' ? ' active' : ''}`} data-ui-role="button" data-ui-variant="secondary" data-ui-id="open-system-status" onClick={(event) => openSystem(event.currentTarget)} aria-expanded={contextView?.kind === 'system'}>
               <i />{dashboard?.health?.ok ? '系统正常' : '需要检查'}
             </button>
-            <button type="button" className="ghost-button refresh-local-button" data-ui-role="button" data-ui-variant="secondary" data-ui-id="refresh-workbench" onClick={() => void refreshCurrent()} aria-label="刷新本地数据" disabled={loading}>↻ 刷新本地数据</button>
+            <button type="button" className="ghost-button refresh-local-button" data-ui-role="button" data-ui-variant="secondary" data-ui-id="refresh-workbench" onClick={() => void refreshCurrent()} aria-label="刷新本地数据" disabled={loading}><span aria-hidden="true">↻</span><span className="refresh-local-label">刷新本地数据</span></button>
           </div>
         </header>
 
@@ -1606,10 +1606,10 @@ const placementsByDate = useMemo(() => {
   return map;
 }, [byDate, dates]);
 
-  const gridTemplate = '44px repeat(7, minmax(0, 1fr))';
+  const gridTemplate = '36px repeat(7, minmax(0, 1fr))';
   const timedItems = items.filter((item) => item.start_at || item.deadline_at);
   const { startHour, endHour } = calendarHourBounds(timedItems);
-  const hourHeight = 64;
+  const hourHeight = 60;
   const calendarHeight = (endHour - startHour) * hourHeight;
   const hours = Array.from({ length: endHour - startHour + 1 }, (_, index) => startHour + index);
 

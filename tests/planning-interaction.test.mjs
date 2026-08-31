@@ -48,11 +48,15 @@ test('week and month remain seven columns with auto and manual page scaling', ()
   assert.match(panel, /className="main-area scalable-main" style=\{\{ zoom: viewScale, width: `\$\{100 \/ viewScale\}%` \}\}/);
   const weekView = panel.slice(panel.indexOf('function WeekCalendar'), panel.indexOf('function MonthCalendar'));
   assert.match(weekView, /const visibleDateSlots = dates/);
-  assert.match(weekView, /const gridTemplate = '44px repeat\(7, minmax\(0, 1fr\)\)'/);
+  assert.match(weekView, /const gridTemplate = '36px repeat\(7, minmax\(0, 1fr\)\)'/);
   assert.doesNotMatch(weekView, /useAdaptiveVisibleDays|dayPage|paginated|focusDate/);
-  assert.match(css, /\.month-grid \{ grid-template-columns: repeat\(7, minmax\(0, 1fr\)\); gap: 6px; \}/);
+  assert.match(css, /\.month-grid \{ grid-template-columns: repeat\(7, minmax\(0, 1fr\)\); gap: 4px; \}/);
   assert.match(css, /overflow-x: hidden/);
+  assert.doesNotMatch(css, /min-width: 820px|min-width: 760px/);
   assert.match(css, /@container \(max-width: 720px\)/);
+  assert.match(css, /@media \(max-width: 960px\)[\s\S]*grid-template-rows: auto auto/);
+  assert.match(css, /top-actions button \{ min-width: 0; white-space: nowrap; \}/);
+  assert.match(panel, /className="refresh-local-label">刷新本地数据<\/span>/);
 });
 
 test('month day drawer fits about eight to nine compact people cards without changing month cells', () => {

@@ -1192,10 +1192,10 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
 .month-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 
 @media (max-width: 900px) {
-  .week-calendar-canvas { min-width: 820px; }
+  .week-calendar-canvas { min-width: 0; }
 }
 @media (max-width: 760px) {
-  .month-calendar { min-width: 760px; }
+  .month-calendar { min-width: 0; }
   .calendar-legend small { flex-basis: 100%; }
 }
 
@@ -1902,4 +1902,92 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
   .month-course-summary > div { min-height: 58px; }
   .schedule-conflict-alert > div { align-items: flex-start; flex-direction: column; gap: 2px; }
   .refresh-local-button { padding-inline: 9px; font-size: 11px; }
+}
+
+/* v2.12.7：七列全量收窄；中窄窗口顶栏分层，不再把按钮文字挤成竖排。 */
+.main-area { max-width: 1140px; padding: 22px 20px 40px; }
+.topbar { min-height: 64px; padding: 8px 20px; box-shadow: 0 7px 22px rgba(33, 40, 35, .028); }
+.top-actions,
+.top-actions > *,
+.top-actions button { min-width: 0; white-space: nowrap; }
+.tabbar { border-radius: 10px; }
+.tab { min-height: 36px; padding: 8px 14px; border-radius: 8px; }
+.view-scale-control { border-radius: 8px; }
+.ai-action-button,
+.health-button,
+.refresh-local-button { min-height: 34px; }
+.refresh-local-button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
+.calendar-panel { padding: 14px; border-radius: 12px; }
+.month-course-summary { gap: 8px; margin-bottom: 11px; }
+.month-course-summary > div { min-height: 64px; padding: 9px 12px; border-radius: 10px; }
+.schedule-conflict-alert { margin-bottom: 11px; padding: 10px 12px; border-radius: 10px; }
+.calendar-legend { gap: 5px; margin-bottom: 8px; }
+.calendar-legend > span { padding: 4px 7px; }
+.week-calendar-scroll,
+.month-calendar-scroll { padding: 2px 0 6px; }
+.week-calendar-canvas,
+.month-calendar { width: 100%; min-width: 0; }
+.week-calendar-header,
+.week-calendar-body { grid-template-columns: 36px repeat(7, minmax(0, 1fr)); gap: 4px; }
+.week-calendar-body { margin-top: 4px; }
+.week-corner { padding-right: 4px; font-size: 8px; }
+.week-time-axis span { right: 4px; font-size: 8px; }
+.week-day-header,
+.week-day-track { border-radius: 8px; }
+.week-day-header { min-height: 52px; gap: 1px 5px; padding: 6px 7px; }
+.week-day-header span { font-size: 9px; }
+.week-day-header strong { font-size: 18px; }
+.week-day-header small { font-size: 8px; }
+.week-day-track {
+  background:
+    repeating-linear-gradient(to bottom, color-mix(in srgb, var(--wb-text) 2.4%, transparent) 0 60px, transparent 60px 120px),
+    var(--wb-surface-soft);
+}
+.week-time-block { min-height: 28px; gap: 1px; padding: 5px; border-radius: 7px; box-shadow: 0 3px 9px rgba(33, 40, 35, .04); }
+.week-time-block strong,
+.week-time-block span { font-size: 9.5px; line-height: 1.25; }
+.month-weekdays,
+.month-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.month-weekdays { margin-bottom: 4px; }
+.month-weekdays span { padding: 4px 6px; font-size: 9px; }
+.month-cell { min-height: 114px; gap: 6px; padding: 8px; border-radius: 8px; }
+.month-cell header strong { font-size: 14px; }
+.month-item-list { gap: 3px; }
+.month-item { gap: 4px; padding: 3px 4px; border-radius: 5px; font-size: 8.5px; }
+
+@media (max-width: 960px) {
+  .topbar { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; gap: 7px; }
+  .topbar > .tabbar { grid-row: 1; grid-column: 1; justify-self: center; }
+  .topbar > .top-actions { grid-row: 2; grid-column: 1; justify-self: center; max-width: 100%; gap: 6px; }
+  .updated-at { display: none; }
+}
+
+@media (max-width: 620px) {
+  .topbar { padding: 8px 10px; }
+  .topbar > .tabbar { width: 100%; }
+  .tab { flex: 1 1 0; padding-inline: 7px; }
+  .topbar > .top-actions { width: 100%; justify-content: flex-end; }
+  .view-scale-control { margin-right: auto; }
+  .health-button { display: none; }
+  .refresh-local-button { width: 34px; padding: 0; }
+  .refresh-local-label { display: none; }
+  .main-area { padding: 16px 9px 30px; }
+  .calendar-panel { padding: 9px; }
+  .week-calendar-header,
+  .week-calendar-body,
+  .month-weekdays,
+  .month-grid { gap: 2px; }
+  .week-calendar-header,
+  .week-calendar-body { grid-template-columns: 30px repeat(7, minmax(0, 1fr)); }
+  .week-corner { padding-right: 2px; font-size: 7px; }
+  .week-time-axis span { right: 2px; font-size: 7px; }
+  .week-day-header { min-height: 48px; padding: 5px 3px; border-radius: 7px; }
+  .week-day-header strong { font-size: 15px; }
+  .week-day-header span { font-size: 8px; }
+  .week-day-header small { font-size: 7px; }
+  .week-time-block { padding: 4px 3px; border-radius: 6px; }
+  .week-time-block strong,
+  .week-time-block span { font-size: 8px; }
+  .month-cell { min-height: 104px; padding: 6px 4px; border-radius: 7px; }
+  .month-item { padding: 3px; font-size: 7.5px; }
 }
