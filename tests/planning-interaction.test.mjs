@@ -40,6 +40,21 @@ test('primary week and month schedule is read-only while AI keeps operation capa
   assert.doesNotMatch(contextCard, /本次不上|调时间|取消…|affairComplete/);
 });
 
+test('week and month remain seven columns with auto and manual page scaling', () => {
+  assert.match(panel, /width < 680 \? 0\.7 : width < 900 \? 0\.8 : width < 1120 \? 0\.9 : 1/);
+  assert.match(panel, /className="view-scale-control" role="group" aria-label="页面缩放"/);
+  assert.match(panel, /aria-label="缩小页面"/);
+  assert.match(panel, /aria-label="放大页面"/);
+  assert.match(panel, /className="main-area scalable-main" style=\{\{ zoom: viewScale, width: `\$\{100 \/ viewScale\}%` \}\}/);
+  const weekView = panel.slice(panel.indexOf('function WeekCalendar'), panel.indexOf('function MonthCalendar'));
+  assert.match(weekView, /const visibleDateSlots = dates/);
+  assert.match(weekView, /const gridTemplate = '44px repeat\(7, minmax\(0, 1fr\)\)'/);
+  assert.doesNotMatch(weekView, /useAdaptiveVisibleDays|dayPage|paginated|focusDate/);
+  assert.match(css, /\.month-grid \{ grid-template-columns: repeat\(7, minmax\(0, 1fr\)\); gap: 6px; \}/);
+  assert.match(css, /overflow-x: hidden/);
+  assert.match(css, /@container \(max-width: 720px\)/);
+});
+
 test('month day drawer fits about eight to nine compact people cards without changing month cells', () => {
   assert.match(panel, /view\.kind === 'day' \? 'context-item-list context-day-list'/);
   assert.match(panel, /dayItems\.slice\(0, 3\)/);

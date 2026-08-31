@@ -93,6 +93,12 @@ body {
 .tab.active { color: var(--wb-text); background: var(--wb-card); box-shadow: 0 3px 10px rgba(35,43,37,.07); font-weight: 650; }
 
 .top-actions { justify-self: end; display: flex; align-items: center; gap: 10px; }
+.view-scale-control { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 9px; background: var(--wb-surface-soft); }
+.view-scale-control button { min-width: 28px; height: 28px; padding: 0 7px; border-radius: 7px; background: transparent; color: var(--wb-muted); font-size: 11px; }
+.view-scale-control button:hover:not(:disabled),
+.view-scale-control button.active { background: var(--wb-card); color: var(--wb-text); }
+.view-scale-control button.auto { min-width: 66px; font-variant-numeric: tabular-nums; }
+.view-scale-control button:disabled { opacity: .34; cursor: default; }
 .health { display: inline-flex; align-items: center; gap: 6px; color: var(--wb-muted); font-size: 12px; }
 .health i { width: 7px; height: 7px; border-radius: 50%; }
 .health.good i { background: #5c9b72; box-shadow: 0 0 0 4px rgba(92,155,114,.12); }
@@ -517,8 +523,10 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
 .status { font-size: 10px; padding: 4px 9px; }
 
 @media (max-width: 960px) {
-  .topbar { grid-template-columns: 1fr auto; }
-  .tabbar { grid-row: 2; grid-column: 1 / -1; justify-self: center; }
+  .topbar { grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+  .tabbar { grid-row: 1; grid-column: 1; justify-self: start; }
+  .top-actions { grid-row: 1; grid-column: 2; justify-self: end; gap: 6px; }
+  .updated-at { display: none; }
   .metrics-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .content-grid, .affairs-grid, .action-layout, .ai-workspace-grid { grid-template-columns: 1fr; }
   .next-course-banner { grid-template-columns: auto 1fr; }
@@ -533,6 +541,8 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
 @media (max-width: 620px) {
   .topbar { padding: 10px 13px; }
   .health, .updated-at { display: none; }
+  .view-scale-control button { min-width: 25px; padding-inline: 5px; }
+  .view-scale-control button.auto { min-width: 58px; }
   .main-area { padding: 20px 13px 38px; }
   .hero-row { align-items: flex-start; flex-direction: column; }
   .scope-switch { width: 100%; }
@@ -993,7 +1003,7 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
 }
 
 /* v2.12.4：只读周/月统一日程看板。 */
-.calendar-panel { grid-column: 1 / -1; padding: 18px; }
+.calendar-panel { grid-column: 1 / -1; padding: 18px; container-type: inline-size; }
 .read-only-schedule { gap: 0; }
 .month-course-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 4px 0 14px; }
 .month-course-summary > div { display: flex; flex-direction: column; gap: 4px; min-height: 72px; justify-content: center; padding: 11px 14px; border-radius: 12px; background: color-mix(in srgb, var(--wb-accent) 7%, var(--wb-surface-soft)); }
@@ -1009,7 +1019,7 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
 .refresh-local-button { white-space: nowrap; }
 .overview-side { grid-column: 1 / -1; }
 .week-calendar-scroll,
-.month-calendar-scroll { overflow-x: auto; overscroll-behavior-inline: contain; padding: 4px 1px 8px; scrollbar-width: thin; }
+.month-calendar-scroll { overflow-x: hidden; overscroll-behavior-inline: contain; padding: 4px 1px 8px; scrollbar-width: none; }
 .week-calendar-canvas { min-width: 1080px; }
 .week-calendar-header,
 .week-calendar-body { display: grid; grid-template-columns: 60px repeat(7, minmax(132px, 1fr)); gap: 8px; }
@@ -1172,7 +1182,7 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
 .month-calendar-scroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .week-calendar-canvas { width: 100%; min-width: 0; }
 .week-calendar-header,
-.week-calendar-body { grid-template-columns: 52px repeat(7, minmax(0, 1fr)); gap: 6px; }
+.week-calendar-body { grid-template-columns: 44px repeat(7, minmax(0, 1fr)); gap: 6px; }
 .week-corner,
 .week-time-axis span { padding-right: 5px; }
 .week-day-header { padding-inline: 8px; }
@@ -1870,6 +1880,23 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
 .quick-pending-item button:is(.primary, .secondary):hover { background: color-mix(in srgb, var(--wb-accent) 20%, var(--wb-card)); }
 
 /* 空队列不渲染功能块；建议单独出现时保持一块，不与待处理伪装成并列主任务。 */
+@container (max-width: 720px) {
+  .week-calendar-header,
+  .week-calendar-body,
+  .month-weekdays,
+  .month-grid { gap: 3px; }
+  .week-day-header { min-height: 54px; padding: 6px 5px; gap: 1px 3px; }
+  .week-day-header strong { font-size: 16px; }
+  .week-day-header span { font-size: 9px; }
+  .week-day-header small { font-size: 8px; }
+  .week-time-block { padding: 5px 4px; }
+  .week-time-block strong,
+  .week-time-block span { font-size: 9px; }
+  .month-cell { min-height: 116px; padding: 7px 6px; gap: 5px; }
+  .month-cell header strong { font-size: 13px; }
+  .month-item { padding: 3px 4px; font-size: 8px; }
+}
+
 @media (max-width: 700px) {
   .month-course-summary { grid-template-columns: 1fr; }
   .month-course-summary > div { min-height: 58px; }

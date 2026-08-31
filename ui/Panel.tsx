@@ -468,6 +468,12 @@ function Panel() {
   const initialPreview = params.get('preview');
   const [tab, setTab] = useState<Tab>(initialTab);
   const [scope, setScope] = useState<Scope>(initialScope);
+  const [manualViewScale, setManualViewScale] = useState<number | null>(() => {
+    const stored = Number(window.localStorage.getItem('laosu-workbench.view-scale'));
+    return [0.7, 0.8, 0.9, 1].includes(stored) ? stored : null;
+  });
+  const [autoViewScale, setAutoViewScale] = useState(1);
+  const viewScale = manualViewScale ?? autoViewScale;
   const [actionOpen, setActionOpen] = useState(requestedTab === 'actions' || Boolean(initialPreview));
   const [contextView, setContextView] = useState<ContextView | null>(null);
   const contextOpen = contextView !== null;
@@ -504,6 +510,29 @@ function Panel() {
     planning: Number(window.sessionStorage.getItem('laosu-workbench.scroll.planning') || 0),
     affairs: Number(window.sessionStorage.getItem('laosu-workbench.scroll.affairs') || 0),
   });
+
+  useEffect(() => {
+    const updateAutoScale = () => {
+      const width = window.innerWidth;
+      setAutoViewScale(width < 680 ? 0.7 : width < 900 ? 0.8 : width < 1120 ? 0.9 : 1);
+    };
+    updateAutoScale();
+    window.addEventListener('resize', updateAutoScale);
+    return () => window.removeEventListener('resize', updateAutoScale);
+  }, []);
+
+  function setViewScale(value: number | null) {
+    setManualViewScale(value);
+    if (value === null) window.localStorage.removeItem('laosu-workbench.view-scale');
+    else window.localStorage.setItem('laosu-workbench.view-scale', String(value));
+  }
+
+  function stepViewScale(direction: -1 | 1) {
+    const steps = [0.7, 0.8, 0.9, 1];
+    const current = steps.reduce((best, item) => Math.abs(item - viewScale) < Math.abs(best - viewScale) ? item : best, steps[0]);
+    const index = steps.indexOf(current);
+    setViewScale(steps[Math.max(0, Math.min(steps.length - 1, index + direction))]);
+  }
 
   const loadDashboard = useCallback(async (nextScope: Scope = scope, options: { silent?: boolean; fresh?: boolean } = {}) => {
     const silent = options.silent === true;
@@ -1143,6 +1172,11 @@ function Panel() {
             ))}
           </nav>
           <div className="top-actions" data-ui="top-actions">
+            <div className="view-scale-control" role="group" aria-label="页面缩放">
+              <button type="button" onClick={() => stepViewScale(-1)} disabled={viewScale <= 0.7} aria-label="缩小页面">−</button>
+              <button type="button" className={manualViewScale === null ? 'auto active' : 'auto'} onClick={() => setViewScale(null)} aria-label={`当前缩放 ${Math.round(viewScale * 100)}%，点击恢复自动适配`}>{manualViewScale === null ? `自动 ${Math.round(viewScale * 100)}%` : `${Math.round(viewScale * 100)}%`}</button>
+              <button type="button" onClick={() => stepViewScale(1)} disabled={viewScale >= 1} aria-label="放大页面">＋</button>
+            </div>
             <button type="button" className={actionOpen ? 'ai-action-button active' : 'ai-action-button'} data-ui-role="button" data-ui-variant="secondary" data-ui-id="open-ai" onClick={openAi} aria-expanded={actionOpen}>✦ AI 操作</button>
             <span className="updated-at">{formatUpdated(dashboard?.observedAt)}</span>
             <button type="button" className={`${dashboard?.health?.ok ? 'health good' : 'health bad'} health-button${contextView?.kind === 'system' ? ' active' : ''}`} data-ui-role="button" data-ui-variant="secondary" data-ui-id="open-system-status" onClick={(event) => openSystem(event.currentTarget)} aria-expanded={contextView?.kind === 'system'}>
@@ -1152,7 +1186,7 @@ function Panel() {
           </div>
         </header>
 
-        <main className="main-area">
+        <main className="main-area scalable-main" style={{ zoom: viewScale, width: `${100 / viewScale}%` }}>
           {toast && <div className="toast" role="status">{toast}</div>}
           {error && <Notice tone="error" title="读取失败" text={error} />}
           {dashboard?.warnings?.length ? <Notice tone="warn" title="有警告" text={dashboard.warnings.join('；')} /> : null}
@@ -1548,27 +1582,7 @@ function WeekCalendar({ items, range, localDate, onInspect }: {
 }) {
   const dates = useMemo(() => buildWeekDates(range, localDate), [range, localDate]);
   const dragScroll = useHorizontalDrag();
-  const [dayPage, setDayPage] = useState(0);
-  const [focusDate, setFocusDate] = useState<string | null>(null);
-  const { visibleDays, paginated } = useAdaptiveVisibleDays(dragScroll.ref, Boolean(focusDate));
-  const pageCount = Math.max(1, Math.ceil(7 / Math.max(1, visibleDays)));
-  const visibleDateSlots = useMemo<Array<string | null>>(
-    () => (focusDate ? [focusDate] : paginated ? buildWeekPageSlots(dates, dayPage, visibleDays) : dates),
-    [dates, dayPage, focusDate, paginated, visibleDays],
-  );
-
-  useEffect(() => {
-    setDayPage(0);
-  }, [range, visibleDays]);
-
-  useEffect(() => {
-    if (!focusDate) return undefined;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setFocusDate(null);
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [focusDate]);
+  const visibleDateSlots = dates;
 
   // 画布留痕规则：只保留上过课（已完成·石板色）；过去的已取消/已调课不再回到画布，
   // 过期未标记课程由 itemStateClass(…, localDate) 转为琥珀“过期”提示。
@@ -1583,8 +1597,6 @@ function WeekCalendar({ items, range, localDate, onInspect }: {
     map.forEach((dayItems, date) => map.set(date, [...dayItems].sort((a, b) => String(itemDate(a) || '').localeCompare(String(itemDate(b) || '')))));
     return map;
   }, [items, localDate]);
-  const laneCountsByDate = useMemo(() => new Map(dates.map((date) => [date, maximumLaneCount((byDate.get(date) || []).filter((item) => item.start_at || item.deadline_at))])), [byDate, dates]);
-
 const placementsByDate = useMemo(() => {
   const map = new Map<string, Array<{ item: TimelineItem; lane: number; laneCount: number }>>();
   for (const date of dates) {
@@ -1594,43 +1606,29 @@ const placementsByDate = useMemo(() => {
   return map;
 }, [byDate, dates]);
 
-  const visibleLaneWeights = visibleDateSlots.map((date) => date ? laneCountsByDate.get(date) || 1 : 1);
-  const visibleLaneUnits = visibleLaneWeights.reduce((sum, count) => sum + count, 0);
-  const gridTemplate = `52px ${visibleLaneWeights.map((count) => `minmax(0, ${count}fr)`).join(' ')}`;
+  const gridTemplate = '44px repeat(7, minmax(0, 1fr))';
   const timedItems = items.filter((item) => item.start_at || item.deadline_at);
-  const visibleTimedItems = visibleDateSlots.length >= 7 ? timedItems : timedItems.filter((item) => visibleDateSlots.includes(itemDateKey(item)));
-  const { startHour, endHour } = calendarHourBounds(visibleTimedItems);
-  const hourHeight = focusDate ? 92 : visibleDays >= 6 ? 64 : visibleDays >= 4 ? 72 : 84;
+  const { startHour, endHour } = calendarHourBounds(timedItems);
+  const hourHeight = 64;
   const calendarHeight = (endHour - startHour) * hourHeight;
   const hours = Array.from({ length: endHour - startHour + 1 }, (_, index) => startHour + index);
 
   return (
-    <>
-      {focusDate ? <div className="planning-day-page-nav overview-week-page-nav" role="group" aria-label="单日聚焦视图">
-        <button type="button" onClick={() => setFocusDate(null)}>‹ 返回整周</button>
-        <strong>{formatDate(`${focusDate}T12:00:00+08:00`, { month: 'long', day: 'numeric', weekday: 'long' })} · 单日视图</strong>
-        <span aria-hidden="true" />
-      </div> : paginated && <div className="planning-day-page-nav overview-week-page-nav" role="group" aria-label="切换本页日期">
-        <button type="button" disabled={dayPage === 0} onClick={() => setDayPage((current) => Math.max(0, current - 1))}>‹ 上一页</button>
-        <strong>第 {dayPage + 1}/{pageCount} 页 · 每页 {visibleDays} 天</strong>
-        <button type="button" disabled={dayPage >= pageCount - 1} onClick={() => setDayPage((current) => Math.min(pageCount - 1, current + 1))}>下一页 ›</button>
-      </div>}
-      <div className="week-calendar-scroll draggable-week-scroll" role="region" tabIndex={0} aria-label="时间视图，点击日期标题聚焦到单日" {...dragScroll}>
+      <div className="week-calendar-scroll draggable-week-scroll" role="region" tabIndex={0} aria-label="七列周时间视图" {...dragScroll}>
       <div className="week-calendar-canvas" style={{ minWidth: 0 }}>
         <div className="week-calendar-header" style={{ gridTemplateColumns: gridTemplate }}>
           <div className="week-corner">时间</div>
-          {visibleDateSlots.map((date, slotIndex) => date ? <button type="button" key={date} className={date === localDate ? 'week-day-header today' : 'week-day-header'} onClick={() => setFocusDate(date)} aria-label={`聚焦到 ${formatDate(`${date}T12:00:00+08:00`, { month: 'long', day: 'numeric', weekday: 'long' })} 的单日视图`}>
+          {visibleDateSlots.map((date) => <div key={date} className={date === localDate ? 'week-day-header today' : 'week-day-header'}>
             <span>{formatDate(`${date}T12:00:00+08:00`, { weekday: 'short' })}</span>
             <strong>{Number(date.slice(8, 10))}</strong>
             <small>{byDate.get(date)?.length || 0} 项</small>
-          </button> : <div className="week-day-header empty-slot" key={`empty-${slotIndex}`} aria-hidden="true" />)}
+          </div>)}
         </div>
         <div className="week-calendar-body" style={{ gridTemplateColumns: gridTemplate }}>
           <div className="week-time-axis" style={{ height: calendarHeight }}>
             {hours.map((hour) => <span key={hour} style={{ top: (hour - startHour) * hourHeight }}>{String(hour).padStart(2, '0')}:00</span>)}
           </div>
-          {visibleDateSlots.map((date, slotIndex) => {
-            if (!date) return <div className="week-day-track empty-slot" key={`empty-${slotIndex}`} style={{ height: calendarHeight }} aria-hidden="true" />;
+          {visibleDateSlots.map((date) => {
             const placements = placementsByDate.get(date) || [];
             return <div className={date === localDate ? 'week-day-track today' : 'week-day-track'} key={date} style={{ height: calendarHeight }}>
               {placements.map(({ item, lane, laneCount }) => {
@@ -1667,7 +1665,6 @@ const placementsByDate = useMemo(() => {
         </div>
       </div>
     </div>
-    </>
   );
 }
 
