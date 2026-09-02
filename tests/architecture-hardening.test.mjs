@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { parseApiResponse } from '../ui/api-response.ts';
+import { fetchPluginApiWithRetry } from '../ui/request-retry.ts';
 import { createRequestGate } from '../ui/request-gate.ts';
 import { createSnapshotCache } from '../lib/snapshot-cache.js';
 import { createRerunQueue } from '../lib/rerun-queue.js';
@@ -22,6 +23,34 @@ test('API 非 2xx 即使带 error 字段也会抛可读错误', async () => {
 test('API 非 JSON 错误响应不会暴露 JSON SyntaxError', async () => {
   const response = new Response('<html>forbidden</html>', { status: 403 });
   await assert.rejects(() => parseApiResponse(response), /HTTP 403/);
+});
+
+test('GET 读取遇到瞬时失败会自动重试一次', async () => {
+  let calls = 0;
+  const response = await fetchPluginApiWithRetry(async () => {
+    calls += 1;
+    if (calls === 1) throw new Error('surface session switching');
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  }, 'api/dashboard?fresh=1', undefined, { delayMs: 0 });
+  assert.equal(response.status, 200);
+  assert.equal(calls, 2);
+});
+
+test('GET 读取遇到瞬时服务错误会重试，写请求绝不重放', async () => {
+  let readCalls = 0;
+  const readResponse = await fetchPluginApiWithRetry(async () => {
+    readCalls += 1;
+    return new Response('{}', { status: readCalls === 1 ? 503 : 200 });
+  }, 'api/dashboard?fresh=1', undefined, { delayMs: 0 });
+  assert.equal(readResponse.status, 200);
+  assert.equal(readCalls, 2);
+
+  let writeCalls = 0;
+  await assert.rejects(() => fetchPluginApiWithRetry(async () => {
+    writeCalls += 1;
+    throw new Error('write failed');
+  }, 'api/commit', { method: 'POST' }, { delayMs: 0 }), /write failed/);
+  assert.equal(writeCalls, 1);
 });
 
 test('请求门只接受最新请求', () => {

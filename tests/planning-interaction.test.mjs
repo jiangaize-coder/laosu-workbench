@@ -68,8 +68,10 @@ test('month day drawer fits about eight to nine compact people cards without cha
   assert.match(css, /\.context-day-list \.context-item-card h3[^}]*white-space: nowrap;/);
 });
 
-test('refreshing content is inert and custom buttons prevent Space from scrolling', () => {
+test('refreshing content is inert, preserves current data on failure and custom buttons prevent Space from scrolling', () => {
   assert.match(panel, /inert=\{loading && Boolean\(dashboard\)\}/);
+  assert.match(panel, /preserveOnError: !silent/);
+  assert.match(panel, /刷新未完成，已保留当前数据/);
   const customButtons = panel.match(/\srole="button"/g) || [];
   const preventedActivations = panel.match(/event\.preventDefault\(\);/g) || [];
   assert.ok(customButtons.length >= 4);

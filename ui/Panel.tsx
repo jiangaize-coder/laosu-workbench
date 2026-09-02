@@ -500,6 +500,7 @@ function Panel() {
   const drawerRef = useRef<HTMLElement | null>(null);
   const contextDrawerRef = useRef<HTMLElement | null>(null);
   const dashboardRequestGateRef = useRef(createRequestGate());
+  const lastDashboardErrorRef = useRef('');
   const previewRequestGateRef = useRef(createRequestGate());
   const busyOperationsRef = useRef(new Set<symbol>());
   const lastPointerTargetRef = useRef<HTMLElement | null>(null);
@@ -534,7 +535,7 @@ function Panel() {
     setViewScale(steps[Math.max(0, Math.min(steps.length - 1, index + direction))]);
   }
 
-  const loadDashboard = useCallback(async (nextScope: Scope = scope, options: { silent?: boolean; fresh?: boolean } = {}) => {
+  const loadDashboard = useCallback(async (nextScope: Scope = scope, options: { silent?: boolean; fresh?: boolean; preserveOnError?: boolean } = {}) => {
     const silent = options.silent === true;
     const requestId = dashboardRequestGateRef.current.begin();
     if (!silent) {
@@ -548,10 +549,14 @@ function Panel() {
       if (!dashboardRequestGateRef.current.isCurrent(requestId)) return null;
       setDashboard(data);
       writeWorkbenchCache(`dashboard.${nextScope}`, data);
+      lastDashboardErrorRef.current = '';
+      setError('');
       return true;
     } catch (err: any) {
       if (!dashboardRequestGateRef.current.isCurrent(requestId)) return null;
-      if (!silent) setError(err.message || '读取失败');
+      const message = err.message || '读取失败';
+      lastDashboardErrorRef.current = message;
+      if (!silent && !options.preserveOnError) setError(message);
       return false;
     } finally {
       if (dashboardRequestGateRef.current.isCurrent(requestId) && !silent) setLoading(false);
@@ -985,14 +990,14 @@ function Panel() {
     const silent = options.silent === true;
     if (!silent) setToast('正在刷新数据…');
     // fresh=1 失效服务端快照，重新读取排课与事务脚本。
-    const ok = await loadDashboard(scope, { ...options, fresh: !silent });
+    const ok = await loadDashboard(scope, { ...options, fresh: !silent, preserveOnError: !silent });
     if (ok === true) {
       setAffairFeedback({});
       setDayCompleteFeedback(null);
       setPlanningRevision((current) => current + 1);
       if (!silent) setToast('本地课程与事务数据已刷新');
     } else if (ok === false && !silent) {
-      setToast('刷新失败，请查看页面错误');
+      setToast(`刷新未完成，已保留当前数据：${lastDashboardErrorRef.current || '读取失败'}`);
     }
   }
 
