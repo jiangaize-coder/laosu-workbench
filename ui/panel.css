@@ -1991,3 +1991,8 @@ button.row-action-button:disabled { opacity: .5; cursor: wait; }
   .month-cell { min-height: 104px; padding: 6px 4px; border-radius: 7px; }
   .month-item { padding: 3px; font-size: 7.5px; }
 }
+
+/* v2.12.9：手动刷新只更新按钮状态，现有课表保持可看可用。 */
+.refresh-local-button[aria-busy="true"] { color: var(--wb-accent); background: color-mix(in srgb, var(--wb-accent) 11%, var(--wb-card)); }
+.refresh-local-button[aria-busy="true"] > span:first-child { animation: refresh-turn .8s linear infinite; }
+@keyframes refresh-turn { to { transform: rotate(360deg); } }

@@ -479,6 +479,7 @@ function Panel() {
   const contextOpen = contextView !== null;
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [actionPreset, setActionPreset] = useState<ActionPreset | null>(null);
@@ -501,6 +502,7 @@ function Panel() {
   const contextDrawerRef = useRef<HTMLElement | null>(null);
   const dashboardRequestGateRef = useRef(createRequestGate());
   const lastDashboardErrorRef = useRef('');
+  const manualRefreshRef = useRef(false);
   const previewRequestGateRef = useRef(createRequestGate());
   const busyOperationsRef = useRef(new Set<symbol>());
   const lastPointerTargetRef = useRef<HTMLElement | null>(null);
@@ -805,7 +807,7 @@ function Panel() {
   const dataRevisionRef = useRef<number | null>(null);
   useEffect(() => {
     const timer = window.setInterval(async () => {
-      if (document.hidden) return;
+      if (document.hidden || manualRefreshRef.current) return;
       try {
         const res = await api<{ ok: boolean; revision: number }>('api/data-revision');
         if (!res?.ok || typeof res.revision !== 'number') return;
@@ -988,16 +990,30 @@ function Panel() {
 
   async function refreshCurrent(options: { silent?: boolean } = {}) {
     const silent = options.silent === true;
-    if (!silent) setToast('正在刷新数据…');
-    // fresh=1 失效服务端快照，重新读取排课与事务脚本。
-    const ok = await loadDashboard(scope, { ...options, fresh: !silent, preserveOnError: !silent });
-    if (ok === true) {
-      setAffairFeedback({});
-      setDayCompleteFeedback(null);
-      setPlanningRevision((current) => current + 1);
-      if (!silent) setToast('本地课程与事务数据已刷新');
-    } else if (ok === false && !silent) {
-      setToast(`刷新未完成，已保留当前数据：${lastDashboardErrorRef.current || '读取失败'}`);
+    if (!silent && manualRefreshRef.current) return;
+    if (!silent) {
+      manualRefreshRef.current = true;
+      setRefreshing(true);
+      setToast('正在刷新数据…');
+    }
+    try {
+      // 手动刷新保持现有页面可用，只让刷新按钮进入忙碌态；fresh=1 重新读取底层脚本。
+      const ok = await loadDashboard(scope, { ...options, silent: true, fresh: !silent, preserveOnError: !silent });
+      if (ok === true) {
+        setAffairFeedback({});
+        setDayCompleteFeedback(null);
+        setPlanningRevision((current) => current + 1);
+        if (!silent) setToast('本地课程与事务数据已刷新');
+      } else if (ok === false && !silent) {
+        setToast(`刷新未完成，已保留当前数据：${lastDashboardErrorRef.current || '读取失败'}`);
+      } else if (ok === null && !silent) {
+        setToast('视图已切换，当前页面正在读取最新数据');
+      }
+    } finally {
+      if (!silent) {
+        manualRefreshRef.current = false;
+        setRefreshing(false);
+      }
     }
   }
 
@@ -1187,7 +1203,7 @@ function Panel() {
             <button type="button" className={`${dashboard?.health?.ok ? 'health good' : 'health bad'} health-button${contextView?.kind === 'system' ? ' active' : ''}`} data-ui-role="button" data-ui-variant="secondary" data-ui-id="open-system-status" onClick={(event) => openSystem(event.currentTarget)} aria-expanded={contextView?.kind === 'system'}>
               <i />{dashboard?.health?.ok ? '系统正常' : '需要检查'}
             </button>
-            <button type="button" className="ghost-button refresh-local-button" data-ui-role="button" data-ui-variant="secondary" data-ui-id="refresh-workbench" onClick={() => void refreshCurrent()} aria-label="刷新本地数据" disabled={loading}><span aria-hidden="true">↻</span><span className="refresh-local-label">刷新本地数据</span></button>
+            <button type="button" className="ghost-button refresh-local-button" data-ui-role="button" data-ui-variant="secondary" data-ui-id="refresh-workbench" onClick={() => void refreshCurrent()} aria-label={refreshing ? '正在刷新本地数据' : '刷新本地数据'} aria-busy={refreshing} disabled={loading || refreshing}><span aria-hidden="true">↻</span><span className="refresh-local-label">{refreshing ? '刷新中…' : '刷新本地数据'}</span></button>
           </div>
         </header>
 

@@ -56,7 +56,7 @@ test('week and month remain seven columns with auto and manual page scaling', ()
   assert.match(css, /@container \(max-width: 720px\)/);
   assert.match(css, /@media \(max-width: 960px\)[\s\S]*grid-template-rows: auto auto/);
   assert.match(css, /top-actions button \{ min-width: 0; white-space: nowrap; \}/);
-  assert.match(panel, /className="refresh-local-label">刷新本地数据<\/span>/);
+  assert.match(panel, /className="refresh-local-label">\{refreshing \? '刷新中…' : '刷新本地数据'\}<\/span>/);
 });
 
 test('month day drawer fits about eight to nine compact people cards without changing month cells', () => {
@@ -68,10 +68,14 @@ test('month day drawer fits about eight to nine compact people cards without cha
   assert.match(css, /\.context-day-list \.context-item-card h3[^}]*white-space: nowrap;/);
 });
 
-test('refreshing content is inert, preserves current data on failure and custom buttons prevent Space from scrolling', () => {
+test('manual refresh stays non-blocking, deduplicated and preserves current data on failure', () => {
   assert.match(panel, /inert=\{loading && Boolean\(dashboard\)\}/);
-  assert.match(panel, /preserveOnError: !silent/);
+  assert.match(panel, /const \[refreshing, setRefreshing\] = useState\(false\)/);
+  assert.match(panel, /if \(!silent && manualRefreshRef\.current\) return/);
+  assert.match(panel, /silent: true, fresh: !silent, preserveOnError: !silent/);
+  assert.match(panel, /aria-busy=\{refreshing\} disabled=\{loading \|\| refreshing\}/);
   assert.match(panel, /刷新未完成，已保留当前数据/);
+  assert.match(css, /refresh-local-button\[aria-busy="true"\]/);
   const customButtons = panel.match(/\srole="button"/g) || [];
   const preventedActivations = panel.match(/event\.preventDefault\(\);/g) || [];
   assert.ok(customButtons.length >= 4);
