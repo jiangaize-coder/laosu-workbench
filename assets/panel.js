@@ -45,55 +45,55 @@ function ay() {
     enqueueSetState: function() {
     }
   }, ve = Object.assign, V = {};
-  function ce(h, D, X) {
-    this.props = h, this.context = D, this.refs = V, this.updater = X || Q;
+  function ce(h, M, X) {
+    this.props = h, this.context = M, this.refs = V, this.updater = X || Q;
   }
-  ce.prototype.isReactComponent = {}, ce.prototype.setState = function(h, D) {
+  ce.prototype.isReactComponent = {}, ce.prototype.setState = function(h, M) {
     if (typeof h != "object" && typeof h != "function" && h != null)
       throw Error(
         "takes an object of state variables to update or a function which returns an object of state variables."
       );
-    this.updater.enqueueSetState(this, h, D, "setState");
+    this.updater.enqueueSetState(this, h, M, "setState");
   }, ce.prototype.forceUpdate = function(h) {
     this.updater.enqueueForceUpdate(this, h, "forceUpdate");
   };
-  function le() {
+  function ne() {
   }
-  le.prototype = ce.prototype;
-  function ne(h, D, X) {
-    this.props = h, this.context = D, this.refs = V, this.updater = X || Q;
+  ne.prototype = ce.prototype;
+  function ie(h, M, X) {
+    this.props = h, this.context = M, this.refs = V, this.updater = X || Q;
   }
-  var $ = ne.prototype = new le();
-  $.constructor = ne, ve($, ce.prototype), $.isPureReactComponent = !0;
+  var $ = ie.prototype = new ne();
+  $.constructor = ie, ve($, ce.prototype), $.isPureReactComponent = !0;
   var Ne = Array.isArray;
   function pe() {
   }
   var Z = { H: null, A: null, T: null, S: null }, k = Object.prototype.hasOwnProperty;
-  function F(h, D, X) {
+  function F(h, M, X) {
     var K = X.ref;
     return {
       $$typeof: c,
       type: h,
-      key: D,
+      key: M,
       ref: K !== void 0 ? K : null,
       props: X
     };
   }
-  function re(h, D) {
-    return F(h.type, D, h.props);
+  function re(h, M) {
+    return F(h.type, M, h.props);
   }
   function J(h) {
     return typeof h == "object" && h !== null && h.$$typeof === c;
   }
   function ae(h) {
-    var D = { "=": "=0", ":": "=2" };
+    var M = { "=": "=0", ":": "=2" };
     return "$" + h.replace(/[=:]/g, function(X) {
-      return D[X];
+      return M[X];
     });
   }
   var be = /\/+/g;
-  function De(h, D) {
-    return typeof h == "object" && h !== null && h.key != null ? ae("" + h.key) : D.toString(36);
+  function De(h, M) {
+    return typeof h == "object" && h !== null && h.key != null ? ae("" + h.key) : M.toString(36);
   }
   function Oe(h) {
     switch (h.status) {
@@ -103,11 +103,11 @@ function ay() {
         throw h.reason;
       default:
         switch (typeof h.status == "string" ? h.then(pe, pe) : (h.status = "pending", h.then(
-          function(D) {
-            h.status === "pending" && (h.status = "fulfilled", h.value = D);
+          function(M) {
+            h.status === "pending" && (h.status = "fulfilled", h.value = M);
           },
-          function(D) {
-            h.status === "pending" && (h.status = "rejected", h.reason = D);
+          function(M) {
+            h.status === "pending" && (h.status = "rejected", h.reason = M);
           }
         )), h.status) {
           case "fulfilled":
@@ -118,7 +118,7 @@ function ay() {
     }
     throw h;
   }
-  function g(h, D, X, K, oe) {
+  function g(h, M, X, K, oe) {
     var je = typeof h;
     (je === "undefined" || je === "boolean") && (h = null);
     var Me = !1;
@@ -139,7 +139,7 @@ function ay() {
             case U:
               return Me = h._init, g(
                 Me(h._payload),
-                D,
+                M,
                 X,
                 K,
                 oe
@@ -147,7 +147,7 @@ function ay() {
           }
       }
     if (Me)
-      return oe = oe(h), Me = K === "" ? "." + De(h, 0) : K, Ne(oe) ? (X = "", Me != null && (X = Me.replace(be, "$&/") + "/"), g(oe, D, X, "", function(He) {
+      return oe = oe(h), Me = K === "" ? "." + De(h, 0) : K, Ne(oe) ? (X = "", Me != null && (X = Me.replace(be, "$&/") + "/"), g(oe, M, X, "", function(He) {
         return He;
       })) : oe != null && (J(oe) && (oe = re(
         oe,
@@ -155,14 +155,14 @@ function ay() {
           be,
           "$&/"
         ) + "/") + Me
-      )), D.push(oe)), 1;
+      )), M.push(oe)), 1;
     Me = 0;
     var nt = K === "" ? "." : K + ":";
     if (Ne(h))
       for (var G = 0; G < h.length; G++)
         K = h[G], je = nt + De(K, G), Me += g(
           K,
-          D,
+          M,
           X,
           je,
           oe
@@ -171,7 +171,7 @@ function ay() {
       for (h = G.call(h), G = 0; !(K = h.next()).done; )
         K = K.value, je = nt + De(K, G++), Me += g(
           K,
-          D,
+          M,
           X,
           je,
           oe
@@ -180,48 +180,48 @@ function ay() {
       if (typeof h.then == "function")
         return g(
           Oe(h),
-          D,
+          M,
           X,
           K,
           oe
         );
-      throw D = String(h), Error(
-        "Objects are not valid as a React child (found: " + (D === "[object Object]" ? "object with keys {" + Object.keys(h).join(", ") + "}" : D) + "). If you meant to render a collection of children, use an array instead."
+      throw M = String(h), Error(
+        "Objects are not valid as a React child (found: " + (M === "[object Object]" ? "object with keys {" + Object.keys(h).join(", ") + "}" : M) + "). If you meant to render a collection of children, use an array instead."
       );
     }
     return Me;
   }
-  function B(h, D, X) {
+  function B(h, M, X) {
     if (h == null) return h;
     var K = [], oe = 0;
     return g(h, K, "", "", function(je) {
-      return D.call(X, je, oe++);
+      return M.call(X, je, oe++);
     }), K;
   }
   function I(h) {
     if (h._status === -1) {
-      var D = h._result;
-      D = D(), D.then(
+      var M = h._result;
+      M = M(), M.then(
         function(X) {
           (h._status === 0 || h._status === -1) && (h._status = 1, h._result = X);
         },
         function(X) {
           (h._status === 0 || h._status === -1) && (h._status = 2, h._result = X);
         }
-      ), h._status === -1 && (h._status = 0, h._result = D);
+      ), h._status === -1 && (h._status = 0, h._result = M);
     }
     if (h._status === 1) return h._result.default;
     throw h._result;
   }
   var y = typeof reportError == "function" ? reportError : function(h) {
     if (typeof window == "object" && typeof window.ErrorEvent == "function") {
-      var D = new window.ErrorEvent("error", {
+      var M = new window.ErrorEvent("error", {
         bubbles: !0,
         cancelable: !0,
         message: typeof h == "object" && h !== null && typeof h.message == "string" ? String(h.message) : String(h),
         error: h
       });
-      if (!window.dispatchEvent(D)) return;
+      if (!window.dispatchEvent(M)) return;
     } else if (typeof process == "object" && typeof process.emit == "function") {
       process.emit("uncaughtException", h);
       return;
@@ -229,24 +229,24 @@ function ay() {
     console.error(h);
   }, P = {
     map: B,
-    forEach: function(h, D, X) {
+    forEach: function(h, M, X) {
       B(
         h,
         function() {
-          D.apply(this, arguments);
+          M.apply(this, arguments);
         },
         X
       );
     },
     count: function(h) {
-      var D = 0;
+      var M = 0;
       return B(h, function() {
-        D++;
-      }), D;
+        M++;
+      }), M;
     },
     toArray: function(h) {
-      return B(h, function(D) {
-        return D;
+      return B(h, function(M) {
+        return M;
       }) || [];
     },
     only: function(h) {
@@ -257,7 +257,7 @@ function ay() {
       return h;
     }
   };
-  return xe.Activity = A, xe.Children = P, xe.Component = ce, xe.Fragment = d, xe.Profiler = E, xe.PureComponent = ne, xe.StrictMode = o, xe.Suspense = N, xe.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE = Z, xe.__COMPILER_RUNTIME = {
+  return xe.Activity = A, xe.Children = P, xe.Component = ce, xe.Fragment = d, xe.Profiler = E, xe.PureComponent = ie, xe.StrictMode = o, xe.Suspense = N, xe.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE = Z, xe.__COMPILER_RUNTIME = {
     __proto__: null,
     c: function(h) {
       return Z.H.useMemoCache(h);
@@ -268,15 +268,15 @@ function ay() {
     };
   }, xe.cacheSignal = function() {
     return null;
-  }, xe.cloneElement = function(h, D, X) {
+  }, xe.cloneElement = function(h, M, X) {
     if (h == null)
       throw Error(
         "The argument must be a React element, but you passed " + h + "."
       );
     var K = ve({}, h.props), oe = h.key;
-    if (D != null)
-      for (je in D.key !== void 0 && (oe = "" + D.key), D)
-        !k.call(D, je) || je === "key" || je === "__self" || je === "__source" || je === "ref" && D.ref === void 0 || (K[je] = D[je]);
+    if (M != null)
+      for (je in M.key !== void 0 && (oe = "" + M.key), M)
+        !k.call(M, je) || je === "key" || je === "__self" || je === "__source" || je === "ref" && M.ref === void 0 || (K[je] = M[je]);
     var je = arguments.length - 2;
     if (je === 1) K.children = X;
     else if (1 < je) {
@@ -297,11 +297,11 @@ function ay() {
       $$typeof: j,
       _context: h
     }, h;
-  }, xe.createElement = function(h, D, X) {
+  }, xe.createElement = function(h, M, X) {
     var K, oe = {}, je = null;
-    if (D != null)
-      for (K in D.key !== void 0 && (je = "" + D.key), D)
-        k.call(D, K) && K !== "key" && K !== "__self" && K !== "__source" && (oe[K] = D[K]);
+    if (M != null)
+      for (K in M.key !== void 0 && (je = "" + M.key), M)
+        k.call(M, K) && K !== "key" && K !== "__self" && K !== "__source" && (oe[K] = M[K]);
     var Me = arguments.length - 2;
     if (Me === 1) oe.children = X;
     else if (1 < Me) {
@@ -323,14 +323,14 @@ function ay() {
       _payload: { _status: -1, _result: h },
       _init: I
     };
-  }, xe.memo = function(h, D) {
+  }, xe.memo = function(h, M) {
     return {
       $$typeof: b,
       type: h,
-      compare: D === void 0 ? null : D
+      compare: M === void 0 ? null : M
     };
   }, xe.startTransition = function(h) {
-    var D = Z.T, X = {};
+    var M = Z.T, X = {};
     Z.T = X;
     try {
       var K = h(), oe = Z.S;
@@ -338,47 +338,47 @@ function ay() {
     } catch (je) {
       y(je);
     } finally {
-      D !== null && X.types !== null && (D.types = X.types), Z.T = D;
+      M !== null && X.types !== null && (M.types = X.types), Z.T = M;
     }
   }, xe.unstable_useCacheRefresh = function() {
     return Z.H.useCacheRefresh();
   }, xe.use = function(h) {
     return Z.H.use(h);
-  }, xe.useActionState = function(h, D, X) {
-    return Z.H.useActionState(h, D, X);
-  }, xe.useCallback = function(h, D) {
-    return Z.H.useCallback(h, D);
+  }, xe.useActionState = function(h, M, X) {
+    return Z.H.useActionState(h, M, X);
+  }, xe.useCallback = function(h, M) {
+    return Z.H.useCallback(h, M);
   }, xe.useContext = function(h) {
     return Z.H.useContext(h);
   }, xe.useDebugValue = function() {
-  }, xe.useDeferredValue = function(h, D) {
-    return Z.H.useDeferredValue(h, D);
-  }, xe.useEffect = function(h, D) {
-    return Z.H.useEffect(h, D);
+  }, xe.useDeferredValue = function(h, M) {
+    return Z.H.useDeferredValue(h, M);
+  }, xe.useEffect = function(h, M) {
+    return Z.H.useEffect(h, M);
   }, xe.useEffectEvent = function(h) {
     return Z.H.useEffectEvent(h);
   }, xe.useId = function() {
     return Z.H.useId();
-  }, xe.useImperativeHandle = function(h, D, X) {
-    return Z.H.useImperativeHandle(h, D, X);
-  }, xe.useInsertionEffect = function(h, D) {
-    return Z.H.useInsertionEffect(h, D);
-  }, xe.useLayoutEffect = function(h, D) {
-    return Z.H.useLayoutEffect(h, D);
-  }, xe.useMemo = function(h, D) {
-    return Z.H.useMemo(h, D);
-  }, xe.useOptimistic = function(h, D) {
-    return Z.H.useOptimistic(h, D);
-  }, xe.useReducer = function(h, D, X) {
-    return Z.H.useReducer(h, D, X);
+  }, xe.useImperativeHandle = function(h, M, X) {
+    return Z.H.useImperativeHandle(h, M, X);
+  }, xe.useInsertionEffect = function(h, M) {
+    return Z.H.useInsertionEffect(h, M);
+  }, xe.useLayoutEffect = function(h, M) {
+    return Z.H.useLayoutEffect(h, M);
+  }, xe.useMemo = function(h, M) {
+    return Z.H.useMemo(h, M);
+  }, xe.useOptimistic = function(h, M) {
+    return Z.H.useOptimistic(h, M);
+  }, xe.useReducer = function(h, M, X) {
+    return Z.H.useReducer(h, M, X);
   }, xe.useRef = function(h) {
     return Z.H.useRef(h);
   }, xe.useState = function(h) {
     return Z.H.useState(h);
-  }, xe.useSyncExternalStore = function(h, D, X) {
+  }, xe.useSyncExternalStore = function(h, M, X) {
     return Z.H.useSyncExternalStore(
       h,
-      D,
+      M,
       X
     );
   }, xe.useTransition = function() {
@@ -412,9 +412,9 @@ function ly() {
       if (I !== B) {
         g[0] = I;
         e: for (var y = 0, P = g.length, h = P >>> 1; y < h; ) {
-          var D = 2 * (y + 1) - 1, X = g[D], K = D + 1, oe = g[K];
+          var M = 2 * (y + 1) - 1, X = g[M], K = M + 1, oe = g[K];
           if (0 > E(X, I))
-            K < P && 0 > E(oe, X) ? (g[y] = oe, g[K] = I, y = K) : (g[y] = X, g[D] = I, y = D);
+            K < P && 0 > E(oe, X) ? (g[y] = oe, g[K] = I, y = K) : (g[y] = X, g[M] = I, y = M);
           else if (K < P && 0 > E(oe, I))
             g[y] = oe, g[K] = I, y = K;
           else break e;
@@ -437,7 +437,7 @@ function ly() {
         return p.now() - R;
       };
     }
-    var N = [], b = [], U = 1, A = null, S = 3, Y = !1, Q = !1, ve = !1, V = !1, ce = typeof setTimeout == "function" ? setTimeout : null, le = typeof clearTimeout == "function" ? clearTimeout : null, ne = typeof setImmediate < "u" ? setImmediate : null;
+    var N = [], b = [], U = 1, A = null, S = 3, Y = !1, Q = !1, ve = !1, V = !1, ce = typeof setTimeout == "function" ? setTimeout : null, ne = typeof clearTimeout == "function" ? clearTimeout : null, ie = typeof setImmediate < "u" ? setImmediate : null;
     function $(g) {
       for (var B = d(b); B !== null; ) {
         if (B.callback === null) o(b);
@@ -467,7 +467,7 @@ function ly() {
         var B = !0;
         try {
           e: {
-            Q = !1, ve && (ve = !1, le(Z), Z = -1), Y = !0;
+            Q = !1, ve && (ve = !1, ne(Z), Z = -1), Y = !0;
             var I = S;
             try {
               t: {
@@ -507,9 +507,9 @@ function ly() {
       }
     }
     var ae;
-    if (typeof ne == "function")
+    if (typeof ie == "function")
       ae = function() {
-        ne(J);
+        ie(J);
       };
     else if (typeof MessageChannel < "u") {
       var be = new MessageChannel(), De = be.port2;
@@ -595,7 +595,7 @@ function ly() {
         startTime: I,
         expirationTime: P,
         sortIndex: -1
-      }, I > y ? (g.sortIndex = I, f(b, g), d(N) === null && g === d(b) && (ve ? (le(Z), Z = -1) : ve = !0, Oe(Ne, I - y))) : (g.sortIndex = P, f(N, g), Q || Y || (Q = !0, pe || (pe = !0, ae()))), g;
+      }, I > y ? (g.sortIndex = I, f(b, g), d(N) === null && g === d(b) && (ve ? (ne(Z), Z = -1) : ve = !0, Oe(Ne, I - y))) : (g.sortIndex = P, f(N, g), Q || Y || (Q = !0, pe || (pe = !0, ae()))), g;
     }, c.unstable_shouldYield = re, c.unstable_wrapCallback = function(g) {
       var B = S;
       return function() {
@@ -875,7 +875,7 @@ function cy() {
     }
     return null;
   }
-  var A = Object.assign, S = /* @__PURE__ */ Symbol.for("react.element"), Y = /* @__PURE__ */ Symbol.for("react.transitional.element"), Q = /* @__PURE__ */ Symbol.for("react.portal"), ve = /* @__PURE__ */ Symbol.for("react.fragment"), V = /* @__PURE__ */ Symbol.for("react.strict_mode"), ce = /* @__PURE__ */ Symbol.for("react.profiler"), le = /* @__PURE__ */ Symbol.for("react.consumer"), ne = /* @__PURE__ */ Symbol.for("react.context"), $ = /* @__PURE__ */ Symbol.for("react.forward_ref"), Ne = /* @__PURE__ */ Symbol.for("react.suspense"), pe = /* @__PURE__ */ Symbol.for("react.suspense_list"), Z = /* @__PURE__ */ Symbol.for("react.memo"), k = /* @__PURE__ */ Symbol.for("react.lazy"), F = /* @__PURE__ */ Symbol.for("react.activity"), re = /* @__PURE__ */ Symbol.for("react.memo_cache_sentinel"), J = Symbol.iterator;
+  var A = Object.assign, S = /* @__PURE__ */ Symbol.for("react.element"), Y = /* @__PURE__ */ Symbol.for("react.transitional.element"), Q = /* @__PURE__ */ Symbol.for("react.portal"), ve = /* @__PURE__ */ Symbol.for("react.fragment"), V = /* @__PURE__ */ Symbol.for("react.strict_mode"), ce = /* @__PURE__ */ Symbol.for("react.profiler"), ne = /* @__PURE__ */ Symbol.for("react.consumer"), ie = /* @__PURE__ */ Symbol.for("react.context"), $ = /* @__PURE__ */ Symbol.for("react.forward_ref"), Ne = /* @__PURE__ */ Symbol.for("react.suspense"), pe = /* @__PURE__ */ Symbol.for("react.suspense_list"), Z = /* @__PURE__ */ Symbol.for("react.memo"), k = /* @__PURE__ */ Symbol.for("react.lazy"), F = /* @__PURE__ */ Symbol.for("react.activity"), re = /* @__PURE__ */ Symbol.for("react.memo_cache_sentinel"), J = Symbol.iterator;
   function ae(e) {
     return e === null || typeof e != "object" ? null : (e = J && e[J] || e["@@iterator"], typeof e == "function" ? e : null);
   }
@@ -903,9 +903,9 @@ function cy() {
       switch (e.$$typeof) {
         case Q:
           return "Portal";
-        case ne:
+        case ie:
           return e.displayName || "Context";
-        case le:
+        case ne:
           return (e._context.displayName || "Context") + ".Consumer";
         case $:
           var t = e.render;
@@ -930,7 +930,7 @@ function cy() {
   function h(e) {
     return { current: e };
   }
-  function D(e) {
+  function M(e) {
     0 > P || (e.current = y[P], y[P] = null, P--);
   }
   function X(e, t) {
@@ -958,10 +958,10 @@ function cy() {
               e = 0;
           }
     }
-    D(K), X(K, e);
+    M(K), X(K, e);
   }
   function G() {
-    D(K), D(oe), D(je);
+    M(K), M(oe), M(je);
   }
   function He(e) {
     e.memoizedState !== null && X(Me, e);
@@ -969,7 +969,7 @@ function cy() {
     t !== a && (X(oe, e), X(K, a));
   }
   function ge(e) {
-    oe.current === e && (D(K), D(oe)), Me.current === e && (D(Me), ri._currentValue = I);
+    oe.current === e && (M(K), M(oe)), Me.current === e && (M(Me), ri._currentValue = I);
   }
   var W, ta;
   function $e(e) {
@@ -1275,9 +1275,9 @@ Error generating stack: ` + l.message + `
   }
   function ji(e, t) {
     var a = t & -t;
-    return a = (a & 42) !== 0 ? 1 : M(a), (a & (e.suspendedLanes | t)) !== 0 ? 0 : a;
+    return a = (a & 42) !== 0 ? 1 : D(a), (a & (e.suspendedLanes | t)) !== 0 ? 0 : a;
   }
-  function M(e) {
+  function D(e) {
     switch (e) {
       case 2:
         e = 1;
@@ -1319,7 +1319,7 @@ Error generating stack: ` + l.message + `
   function L(e) {
     return e &= -e, 2 < e ? 8 < e ? (e & 134217727) !== 0 ? 32 : 268435456 : 8 : 2;
   }
-  function ie() {
+  function le() {
     var e = B.p;
     return e !== 0 ? e : (e = window.event, e === void 0 ? 32 : ah(e.type));
   }
@@ -2370,10 +2370,10 @@ Error generating stack: ` + l.message + `
         default:
           if (typeof e == "object" && e !== null)
             switch (e.$$typeof) {
-              case ne:
+              case ie:
                 s = 10;
                 break e;
-              case le:
+              case ne:
                 s = 9;
                 break e;
               case $:
@@ -2565,7 +2565,7 @@ Error generating stack: ` + l.message + `
     X(gc, t._currentValue), t._currentValue = a;
   }
   function ja(e) {
-    e._currentValue = gc.current, D(gc);
+    e._currentValue = gc.current, M(gc);
   }
   function pc(e, t, a) {
     for (; e !== null; ) {
@@ -2683,7 +2683,7 @@ Error generating stack: ` + l.message + `
       });
     };
   }, km = c.unstable_scheduleCallback, Lm = c.unstable_NormalPriority, Ie = {
-    $$typeof: ne,
+    $$typeof: ie,
     Consumer: null,
     Provider: null,
     _currentValue: null,
@@ -2928,7 +2928,7 @@ Error generating stack: ` + l.message + `
           ), v.return = x, v;
         if (typeof v.then == "function")
           return H(x, Gi(v), _);
-        if (v.$$typeof === ne)
+        if (v.$$typeof === ie)
           return H(
             x,
             ki(x, v),
@@ -2960,7 +2960,7 @@ Error generating stack: ` + l.message + `
             Gi(_),
             q
           );
-        if (_.$$typeof === ne)
+        if (_.$$typeof === ie)
           return z(
             x,
             v,
@@ -3003,7 +3003,7 @@ Error generating stack: ` + l.message + `
             Gi(q),
             he
           );
-        if (q.$$typeof === ne)
+        if (q.$$typeof === ie)
           return C(
             x,
             v,
@@ -3179,7 +3179,7 @@ Error generating stack: ` + l.message + `
             Gi(_),
             q
           );
-        if (_.$$typeof === ne)
+        if (_.$$typeof === ie)
           return Ve(
             x,
             v,
@@ -3363,7 +3363,7 @@ Error generating stack: ` + l.message + `
     X(Qi, wa), X(tn, tn.current);
   }
   function Cc() {
-    wa = Qi.current, D(tn), D(Qi);
+    wa = Qi.current, M(tn), M(Qi);
   }
   var zt = h(null), Vt = null;
   function Va(e) {
@@ -3380,7 +3380,7 @@ Error generating stack: ` + l.message + `
     X(Fe, Fe.current), X(zt, zt.current);
   }
   function Ct(e) {
-    D(zt), Vt === e && (Vt = null), D(Fe);
+    M(zt), Vt === e && (Vt = null), M(Fe);
   }
   var Fe = h(0);
   function Zi(e) {
@@ -3503,7 +3503,7 @@ Error generating stack: ` + l.message + `
   function Fi(e) {
     if (e !== null && typeof e == "object") {
       if (typeof e.then == "function") return Qn(e);
-      if (e.$$typeof === ne) return ft(e);
+      if (e.$$typeof === ie) return ft(e);
     }
     throw Error(o(438, String(e)));
   }
@@ -5691,7 +5691,7 @@ Error generating stack: ` + l.message + `
       case 10:
         return ja(t.type), Qe(t), null;
       case 19:
-        if (D(Fe), l = t.memoizedState, l === null) return Qe(t), null;
+        if (M(Fe), l = t.memoizedState, l === null) return Qe(t), null;
         if (n = (t.flags & 128) !== 0, u = l.rendering, u === null)
           if (n) $n(l, !1);
           else {
@@ -5724,7 +5724,7 @@ Error generating stack: ` + l.message + `
         ), we && ba(t, l.treeForkCount), e) : (Qe(t), null);
       case 22:
       case 23:
-        return Ct(t), Cc(), l = t.memoizedState !== null, e !== null ? e.memoizedState !== null !== l && (t.flags |= 8192) : l && (t.flags |= 8192), l ? (a & 536870912) !== 0 && (t.flags & 128) === 0 && (Qe(t), t.subtreeFlags & 6 && (t.flags |= 8192)) : Qe(t), a = t.updateQueue, a !== null && iu(t, a.retryQueue), a = null, e !== null && e.memoizedState !== null && e.memoizedState.cachePool !== null && (a = e.memoizedState.cachePool.pool), l = null, t.memoizedState !== null && t.memoizedState.cachePool !== null && (l = t.memoizedState.cachePool.pool), l !== a && (t.flags |= 2048), e !== null && D(jl), null;
+        return Ct(t), Cc(), l = t.memoizedState !== null, e !== null ? e.memoizedState !== null !== l && (t.flags |= 8192) : l && (t.flags |= 8192), l ? (a & 536870912) !== 0 && (t.flags & 128) === 0 && (Qe(t), t.subtreeFlags & 6 && (t.flags |= 8192)) : Qe(t), a = t.updateQueue, a !== null && iu(t, a.retryQueue), a = null, e !== null && e.memoizedState !== null && e.memoizedState.cachePool !== null && (a = e.memoizedState.cachePool.pool), l = null, t.memoizedState !== null && t.memoizedState.cachePool !== null && (l = t.memoizedState.cachePool.pool), l !== a && (t.flags |= 2048), e !== null && M(jl), null;
       case 24:
         return a = null, e !== null && (a = e.memoizedState.cache), t.memoizedState.cache !== a && (t.flags |= 2048), ja(Ie), Qe(t), null;
       case 25:
@@ -5759,14 +5759,14 @@ Error generating stack: ` + l.message + `
         }
         return e = t.flags, e & 65536 ? (t.flags = e & -65537 | 128, t) : null;
       case 19:
-        return D(Fe), null;
+        return M(Fe), null;
       case 4:
         return G(), null;
       case 10:
         return ja(t.type), null;
       case 22:
       case 23:
-        return Ct(t), Cc(), e !== null && D(jl), e = t.flags, e & 65536 ? (t.flags = e & -65537 | 128, t) : null;
+        return Ct(t), Cc(), e !== null && M(jl), e = t.flags, e & 65536 ? (t.flags = e & -65537 | 128, t) : null;
       case 24:
         return ja(Ie), null;
       case 25:
@@ -5795,14 +5795,14 @@ Error generating stack: ` + l.message + `
         Ct(t);
         break;
       case 19:
-        D(Fe);
+        M(Fe);
         break;
       case 10:
         ja(t.type);
         break;
       case 22:
       case 23:
-        Ct(t), Cc(), e !== null && D(jl);
+        Ct(t), Cc(), e !== null && M(jl);
         break;
       case 24:
         ja(Ie);
@@ -7150,7 +7150,7 @@ Error generating stack: ` + l.message + `
     }
   }, iv = typeof WeakMap == "function" ? WeakMap : Map, qe = 0, Ge = null, Te = null, ze = 0, Be = 0, wt = null, Qa = !1, sn = !1, hs = !1, wa = 0, Je = 0, Za = 0, zl = 0, ms = 0, Dt = 0, rn = 0, ti = null, Et = null, vs = !1, ru = 0, ed = 0, ou = 1 / 0, fu = null, Ka = null, at = 0, Ja = null, on = null, Da = 0, ys = 0, gs = null, td = null, ai = 0, ps = null;
   function Mt() {
-    return (qe & 2) !== 0 && ze !== 0 ? ze & -ze : g.T !== null ? Ns() : ie();
+    return (qe & 2) !== 0 && ze !== 0 ? ze & -ze : g.T !== null ? Ns() : le();
   }
   function ad() {
     if (Dt === 0)
@@ -9912,7 +9912,7 @@ Error generating stack: ` + l.message + `
     }
   }
   var ri = {
-    $$typeof: ne,
+    $$typeof: ie,
     Provider: null,
     Consumer: null,
     _currentValue: I,
@@ -9963,7 +9963,7 @@ Error generating stack: ` + l.message + `
   function th(e) {
     if (e.tag === 13 || e.tag === 31) {
       var t = Mt();
-      t = M(t);
+      t = D(t);
       var a = yl(e, t);
       a !== null && Nt(a, e, t), Vs(e, t);
     }
@@ -10425,7 +10425,7 @@ Error generating stack: ` + l.message + `
   }
   Mu.prototype.unstable_scheduleHydration = function(e) {
     if (e) {
-      var t = ie();
+      var t = le();
       e = { blockedOn: null, target: e, priority: t };
       for (var a = 0; a < tl.length && t !== 0 && t < tl[a].priority; a++) ;
       tl.splice(a, 0, e), a === 0 && nh(e);
@@ -10496,7 +10496,7 @@ Error generating stack: ` + l.message + `
       s,
       r,
       ch
-    ), t.context = Wd(null), a = t.current, l = Mt(), l = M(l), n = La(l), n.callback = null, Ya(a, n, l), a = l, t.current.lanes = a, fl(t, a), oa(t), e[it] = t.current, zs(e), new Mu(t);
+    ), t.context = Wd(null), a = t.current, l = Mt(), l = D(l), n = La(l), n.callback = null, Ya(a, n, l), a = l, t.current.lanes = a, fl(t, a), oa(t), e[it] = t.current, zs(e), new Mu(t);
   }, mi.version = "19.2.8", mi;
 }
 var ph;
@@ -10734,8 +10734,8 @@ function _y(c = {}) {
   }
   function A(S, Y, Q = {}) {
     const ve = j(), V = Q.timeoutMs ?? E;
-    return new Promise((ce, le) => {
-      const ne = () => {
+    return new Promise((ce, ne) => {
+      const ie = () => {
         f.removeEventListener("message", $), f.clearTimeout(Ne);
       }, $ = (Z) => {
         if (!Eh(Z, d, o))
@@ -10744,9 +10744,9 @@ function _y(c = {}) {
         if (!k.ok)
           return;
         const F = k.value;
-        F.id !== ve || F.type !== S || (F.kind === "response" && (ne(), ce(F.payload)), F.kind === "error" && F.error && (ne(), le(new jh(F.error))));
+        F.id !== ve || F.type !== S || (F.kind === "response" && (ie(), ce(F.payload)), F.kind === "error" && F.error && (ie(), ne(new jh(F.error))));
       }, Ne = f.setTimeout(() => {
-        ne(), le(new jh({
+        ie(), ne(new jh({
           code: "TIMEOUT",
           message: `Plugin host request timed out: ${S}.`
         }));
@@ -11372,65 +11372,65 @@ function Ru(c, f) {
 }
 function Zy() {
   const c = new URLSearchParams(window.location.search), f = c.get("tab") || "overview", d = c.get("scope") || "week", o = "overview", E = ["week", "month"].includes(d) ? d : "week", j = c.get("preview"), [p, R] = w.useState(o), [N, b] = w.useState(E), [U, A] = w.useState(() => {
-    const M = Number(window.localStorage.getItem("laosu-workbench.view-scale"));
-    return [0.7, 0.8, 0.9, 1].includes(M) ? M : null;
-  }), [S, Y] = w.useState(1), Q = U ?? S, [ve, V] = w.useState(f === "actions" || !!j), [ce, le] = w.useState(null), ne = ce !== null, [$, Ne] = w.useState(null), [pe, Z] = w.useState(!0), [k, F] = w.useState(!1), [re, J] = w.useState(""), [ae, be] = w.useState(null), [De, Oe] = w.useState(null), [g, B] = w.useState({ text: "", nonce: 0 }), [I, y] = w.useState(!1), [P, h] = w.useState(""), [D, X] = w.useState(null), [K, oe] = w.useState({}), [je, Me] = w.useState(!1), [nt, G] = w.useState(null), [He, ge] = w.useState(0), [W, ta] = w.useState(null), [$e, aa] = w.useState(null), Qt = w.useRef(null), la = w.useRef(null), na = w.useRef(ur()), mt = w.useRef(""), Ot = w.useRef(!1), st = w.useRef(ur()), fa = w.useRef(/* @__PURE__ */ new Set()), ul = w.useRef(null), _e = w.useRef(!1), Ut = w.useRef(!1), bn = w.useRef({
+    const D = Number(window.localStorage.getItem("laosu-workbench.view-scale"));
+    return [0.7, 0.8, 0.9, 1].includes(D) ? D : null;
+  }), [S, Y] = w.useState(1), Q = U ?? S, [ve, V] = w.useState(f === "actions" || !!j), [ce, ne] = w.useState(null), ie = ce !== null, [$, Ne] = w.useState(null), [pe, Z] = w.useState(!0), [k, F] = w.useState(!1), [re, J] = w.useState(""), [ae, be] = w.useState(null), [De, Oe] = w.useState(null), [g, B] = w.useState({ text: "", nonce: 0 }), [I, y] = w.useState(!1), [P, h] = w.useState(""), [M, X] = w.useState(null), [K, oe] = w.useState({}), [je, Me] = w.useState(!1), [nt, G] = w.useState(null), [He, ge] = w.useState(0), [W, ta] = w.useState(null), [$e, aa] = w.useState(null), Qt = w.useRef(null), la = w.useRef(null), na = w.useRef(ur()), mt = w.useRef(""), Ot = w.useRef(!1), st = w.useRef(ur()), fa = w.useRef(/* @__PURE__ */ new Set()), ul = w.useRef(null), _e = w.useRef(!1), Ut = w.useRef(!1), bn = w.useRef({
     overview: Number(window.sessionStorage.getItem("laosu-workbench.scroll.overview") || 0),
     planning: Number(window.sessionStorage.getItem("laosu-workbench.scroll.planning") || 0),
     affairs: Number(window.sessionStorage.getItem("laosu-workbench.scroll.affairs") || 0)
   });
   w.useEffect(() => {
-    const M = () => {
+    const D = () => {
       const L = window.innerWidth;
       Y(L < 680 ? 0.7 : L < 900 ? 0.8 : L < 1120 ? 0.9 : 1);
     };
-    return M(), window.addEventListener("resize", M), () => window.removeEventListener("resize", M);
+    return D(), window.addEventListener("resize", D), () => window.removeEventListener("resize", D);
   }, []);
-  function xn(M) {
-    A(M), M === null ? window.localStorage.removeItem("laosu-workbench.view-scale") : window.localStorage.setItem("laosu-workbench.view-scale", String(M));
+  function xn(D) {
+    A(D), D === null ? window.localStorage.removeItem("laosu-workbench.view-scale") : window.localStorage.setItem("laosu-workbench.view-scale", String(D));
   }
-  function cl(M) {
-    const L = [0.7, 0.8, 0.9, 1], ie = L.reduce((fe, me) => Math.abs(me - Q) < Math.abs(fe - Q) ? me : fe, L[0]), se = L.indexOf(ie);
-    xn(L[Math.max(0, Math.min(L.length - 1, se + M))]);
+  function cl(D) {
+    const L = [0.7, 0.8, 0.9, 1], le = L.reduce((fe, me) => Math.abs(me - Q) < Math.abs(fe - Q) ? me : fe, L[0]), se = L.indexOf(le);
+    xn(L[Math.max(0, Math.min(L.length - 1, se + D))]);
   }
-  const Zt = w.useCallback(async (M = N, L = {}) => {
-    const ie = L.silent === !0, se = na.current.begin();
-    ie || (Z(!0), J(""));
+  const Zt = w.useCallback(async (D = N, L = {}) => {
+    const le = L.silent === !0, se = na.current.begin();
+    le || (Z(!0), J(""));
     try {
-      const fe = new URLSearchParams({ scope: M });
+      const fe = new URLSearchParams({ scope: D });
       L.fresh && fe.set("fresh", "1");
       const me = Vy(await lt(`api/dashboard?${fe.toString()}`));
-      return na.current.isCurrent(se) ? (Ne(me), Ru(`dashboard.${M}`, me), mt.current = "", J(""), !0) : null;
+      return na.current.isCurrent(se) ? (Ne(me), Ru(`dashboard.${D}`, me), mt.current = "", J(""), !0) : null;
     } catch (fe) {
       if (!na.current.isCurrent(se)) return null;
       const me = fe.message || "读取失败";
-      return mt.current = me, !ie && !L.preserveOnError && J(me), !1;
+      return mt.current = me, !le && !L.preserveOnError && J(me), !1;
     } finally {
-      na.current.isCurrent(se) && !ie && Z(!1);
+      na.current.isCurrent(se) && !le && Z(!1);
     }
   }, [N]);
   w.useEffect(() => {
-    const M = yi(`dashboard.${E}`);
-    M && (Ne(M), Z(!1)), Zt(E, { fresh: !0, silent: !!M });
+    const D = yi(`dashboard.${E}`);
+    D && (Ne(D), Z(!1)), Zt(E, { fresh: !0, silent: !!D });
   }, []), w.useEffect(() => {
-    const M = (L) => {
+    const D = (L) => {
       L.target instanceof HTMLElement && !Qt.current?.contains(L.target) && (ul.current = L.target);
     };
-    return window.addEventListener("pointerdown", M, !0), () => window.removeEventListener("pointerdown", M, !0);
+    return window.addEventListener("pointerdown", D, !0), () => window.removeEventListener("pointerdown", D, !0);
   }, []), w.useEffect(() => {
-    j && (V(!0), lt(`api/preview/${encodeURIComponent(j)}`).then(be).catch((M) => {
-      be({ ok: !1, error: M.message });
+    j && (V(!0), lt(`api/preview/${encodeURIComponent(j)}`).then(be).catch((D) => {
+      be({ ok: !1, error: D.message });
     }));
   }, [j]), w.useEffect(() => {
     if (!ve) return;
-    const M = Qt.current, L = document.body.style.overflow;
+    const D = Qt.current, L = document.body.style.overflow;
     if (document.body.style.overflow = "hidden", !_e.current) {
       const ee = new URL(window.location.href);
       ee.searchParams.set("drawer", "actions"), window.history.pushState({ ...window.history.state || {}, laosuActionDrawer: !0 }, "", ee), _e.current = !0;
     }
-    const ie = window.setTimeout(() => {
-      ((De ? M?.querySelector('.manual-operations input:not([type="hidden"]), .manual-operations select:not([name="operation"]), .manual-operations button:not([disabled])') : M?.querySelector(".ai-composer textarea")) || M?.querySelector(".context-back"))?.focus({ preventScroll: !0 }), De && M?.querySelector(".action-drawer-body")?.scrollTo({ top: 0 });
-    }, 80), se = () => Array.from(M?.querySelectorAll(
+    const le = window.setTimeout(() => {
+      ((De ? D?.querySelector('.manual-operations input:not([type="hidden"]), .manual-operations select:not([name="operation"]), .manual-operations button:not([disabled])') : D?.querySelector(".ai-composer textarea")) || D?.querySelector(".context-back"))?.focus({ preventScroll: !0 }), De && D?.querySelector(".action-drawer-body")?.scrollTo({ top: 0 });
+    }, 80), se = () => Array.from(D?.querySelectorAll(
       'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
     ) || []).filter((ee) => ee.getClientRects().length > 0 && !ee.closest("[hidden]")), fe = (ee) => {
       if (ee.key === "Escape") {
@@ -11441,25 +11441,25 @@ function Zy() {
       const it = se();
       if (!it.length) return;
       const Jt = it[0], ma = it[it.length - 1];
-      M?.contains(document.activeElement) ? ee.shiftKey && document.activeElement === Jt ? (ee.preventDefault(), ma.focus()) : !ee.shiftKey && document.activeElement === ma && (ee.preventDefault(), Jt.focus()) : (ee.preventDefault(), (ee.shiftKey ? ma : Jt).focus());
+      D?.contains(document.activeElement) ? ee.shiftKey && document.activeElement === Jt ? (ee.preventDefault(), ma.focus()) : !ee.shiftKey && document.activeElement === ma && (ee.preventDefault(), Jt.focus()) : (ee.preventDefault(), (ee.shiftKey ? ma : Jt).focus());
     }, me = () => {
       _e.current && (_e.current = !1, V(!1), window.setTimeout(() => {
         (document.querySelector('[data-drawer-return="true"]') || document.querySelector(".tab.active"))?.focus({ preventScroll: !0 });
       }, 180));
     };
     return window.addEventListener("keydown", fe), window.addEventListener("popstate", me), () => {
-      window.clearTimeout(ie), document.body.style.overflow = L, window.removeEventListener("keydown", fe), window.removeEventListener("popstate", me), window.setTimeout(() => {
+      window.clearTimeout(le), document.body.style.overflow = L, window.removeEventListener("keydown", fe), window.removeEventListener("popstate", me), window.setTimeout(() => {
         (document.querySelector('[data-drawer-return="true"]') || document.querySelector(".tab.active"))?.focus({ preventScroll: !0 });
       }, 80);
     };
   }, [ve]), w.useEffect(() => {
-    if (!ne) return;
-    const M = la.current, L = document.body.style.overflow;
+    if (!ie) return;
+    const D = la.current, L = document.body.style.overflow;
     if (document.body.style.overflow = "hidden", !Ut.current) {
       const ee = new URL(window.location.href);
       ee.searchParams.set("drawer", "context"), window.history.pushState({ ...window.history.state || {}, laosuContextDrawer: !0 }, "", ee), Ut.current = !0;
     }
-    const ie = window.setTimeout(() => M?.querySelector(".context-back")?.focus({ preventScroll: !0 }), 70), se = () => Array.from(M?.querySelectorAll(
+    const le = window.setTimeout(() => D?.querySelector(".context-back")?.focus({ preventScroll: !0 }), 70), se = () => Array.from(D?.querySelectorAll(
       'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])'
     ) || []).filter((ee) => ee.getClientRects().length > 0 && !ee.closest("[hidden]")), fe = (ee) => {
       if (new URL(window.location.href).searchParams.get("drawer") === "actions") return;
@@ -11471,62 +11471,62 @@ function Zy() {
       const it = se();
       if (!it.length) return;
       const Jt = it[0], ma = it[it.length - 1];
-      M?.contains(document.activeElement) ? ee.shiftKey && document.activeElement === Jt ? (ee.preventDefault(), ma.focus()) : !ee.shiftKey && document.activeElement === ma && (ee.preventDefault(), Jt.focus()) : (ee.preventDefault(), (ee.shiftKey ? ma : Jt).focus());
+      D?.contains(document.activeElement) ? ee.shiftKey && document.activeElement === Jt ? (ee.preventDefault(), ma.focus()) : !ee.shiftKey && document.activeElement === ma && (ee.preventDefault(), Jt.focus()) : (ee.preventDefault(), (ee.shiftKey ? ma : Jt).focus());
     }, me = () => {
       const ee = new URL(window.location.href).searchParams.get("drawer");
-      ee === "context" || ee === "actions" || !Ut.current || (Ut.current = !1, le(null));
+      ee === "context" || ee === "actions" || !Ut.current || (Ut.current = !1, ne(null));
     };
     return window.addEventListener("keydown", fe), window.addEventListener("popstate", me), () => {
-      window.clearTimeout(ie), document.body.style.overflow = L, window.removeEventListener("keydown", fe), window.removeEventListener("popstate", me), window.setTimeout(() => {
+      window.clearTimeout(le), document.body.style.overflow = L, window.removeEventListener("keydown", fe), window.removeEventListener("popstate", me), window.setTimeout(() => {
         (document.querySelector('[data-context-return="true"]') || document.querySelector(".tab.active"))?.focus({ preventScroll: !0 });
       }, 80);
     };
-  }, [ne]), w.useEffect(() => {
+  }, [ie]), w.useEffect(() => {
     window.localStorage.setItem("laosu-workbench.tab", p);
-    const M = () => {
+    const D = () => {
       bn.current[p] = window.scrollY, window.sessionStorage.setItem(`laosu-workbench.scroll.${p}`, String(window.scrollY));
     };
-    return window.addEventListener("pagehide", M), () => window.removeEventListener("pagehide", M);
+    return window.addEventListener("pagehide", D), () => window.removeEventListener("pagehide", D);
   }, [p]), w.useEffect(() => {
     if ($e?.tab === p) return;
-    const M = bn.current[p] || 0;
-    let L = 0, ie, se = !1;
+    const D = bn.current[p] || 0;
+    let L = 0, le, se = !1;
     const fe = () => {
       se = !0;
     }, me = () => {
-      se || (window.scrollTo({ top: M, behavior: "auto" }), L += 1, Math.abs(window.scrollY - M) > 3 && L < 15 && (ie = window.setTimeout(me, 90)));
+      se || (window.scrollTo({ top: D, behavior: "auto" }), L += 1, Math.abs(window.scrollY - D) > 3 && L < 15 && (le = window.setTimeout(me, 90)));
     }, ee = window.requestAnimationFrame(me);
     return window.addEventListener("wheel", fe, { passive: !0 }), window.addEventListener("touchstart", fe, { passive: !0 }), window.addEventListener("keydown", fe), () => {
-      se = !0, window.cancelAnimationFrame(ee), ie && window.clearTimeout(ie), window.removeEventListener("wheel", fe), window.removeEventListener("touchstart", fe), window.removeEventListener("keydown", fe);
+      se = !0, window.cancelAnimationFrame(ee), le && window.clearTimeout(le), window.removeEventListener("wheel", fe), window.removeEventListener("touchstart", fe), window.removeEventListener("keydown", fe);
     };
   }, [p]), w.useEffect(() => {
     if (!$e || $e.tab !== p) return;
-    let M = 0, L, ie, se;
+    let D = 0, L, le, se;
     const fe = () => {
       const ee = Array.from(document.querySelectorAll("[data-item-id]")).find((it) => it.dataset.itemId === $e.id);
-      if (!ee && M < 20) {
-        M += 1, L = window.setTimeout(fe, 60);
+      if (!ee && D < 20) {
+        D += 1, L = window.setTimeout(fe, 60);
         return;
       }
       if (!ee) {
         aa(null);
         return;
       }
-      se = ee, ee.classList.add("target-highlight"), ee.setAttribute("tabindex", "-1"), ee.scrollIntoView({ behavior: "smooth", block: "center" }), ee.focus({ preventScroll: !0 }), ie = window.setTimeout(() => {
+      se = ee, ee.classList.add("target-highlight"), ee.setAttribute("tabindex", "-1"), ee.scrollIntoView({ behavior: "smooth", block: "center" }), ee.focus({ preventScroll: !0 }), le = window.setTimeout(() => {
         ee.classList.remove("target-highlight"), ee.removeAttribute("tabindex"), aa(null);
       }, 2400);
     }, me = window.setTimeout(fe, 50);
     return () => {
-      window.clearTimeout(me), L && window.clearTimeout(L), ie && window.clearTimeout(ie), se?.classList.remove("target-highlight"), se?.removeAttribute("tabindex");
+      window.clearTimeout(me), L && window.clearTimeout(L), le && window.clearTimeout(le), se?.classList.remove("target-highlight"), se?.removeAttribute("tabindex");
     };
   }, [$e, p, $?.observedAt]), w.useEffect(() => {
     if (!P) return;
-    const M = window.setTimeout(() => h(""), 4800);
-    return () => window.clearTimeout(M);
+    const D = window.setTimeout(() => h(""), 4800);
+    return () => window.clearTimeout(D);
   }, [P]);
   const sl = w.useRef(null);
   w.useEffect(() => {
-    const M = window.setInterval(async () => {
+    const D = window.setInterval(async () => {
       if (!(document.hidden || Ot.current))
         try {
           const L = await lt("api/data-revision");
@@ -11535,66 +11535,66 @@ function Zy() {
             sl.current = L.revision;
             return;
           }
-          L.revision !== sl.current && (sl.current = L.revision, ol({ silent: !0 }));
+          L.revision !== sl.current && await ol({ silent: !0, fresh: !0 }) === !0 && (sl.current = L.revision);
         } catch {
         }
     }, 15e3);
-    return () => window.clearInterval(M);
+    return () => window.clearInterval(D);
   }, [N]);
   const qu = w.useMemo(
-    () => ($?.pending ?? []).filter((M) => !["completed", "cancelled"].includes(M.status)),
+    () => ($?.pending ?? []).filter((D) => !["completed", "cancelled"].includes(D.status)),
     [$]
   );
-  async function Hu(M) {
+  async function Hu(D) {
     const L = new URL(window.location.href);
-    L.searchParams.set("scope", M), window.history.replaceState(window.history.state, "", L), b(M);
-    const ie = yi(`dashboard.${M}`);
-    if (ie) {
-      Ne(ie), Z(!1), Zt(M, { fresh: !0, silent: !0 });
+    L.searchParams.set("scope", D), window.history.replaceState(window.history.state, "", L), b(D);
+    const le = yi(`dashboard.${D}`);
+    if (le) {
+      Ne(le), Z(!1), Zt(D, { fresh: !0, silent: !0 });
       return;
     }
-    await Zt(M);
+    await Zt(D);
   }
-  function da(M) {
+  function da(D) {
     document.querySelector('[data-drawer-return="true"]')?.removeAttribute("data-drawer-return");
     const L = document.activeElement;
-    ((L instanceof HTMLElement && L !== document.body && !Qt.current?.contains(L) ? L : null) || M || ul.current || document.querySelector(".tab.active"))?.setAttribute("data-drawer-return", "true");
+    ((L instanceof HTMLElement && L !== document.body && !Qt.current?.contains(L) ? L : null) || D || ul.current || document.querySelector(".tab.active"))?.setAttribute("data-drawer-return", "true");
   }
-  function rt(M) {
+  function rt(D) {
     document.querySelector('[data-context-return="true"]')?.removeAttribute("data-context-return");
-    const L = document.activeElement, ie = L instanceof HTMLElement && L !== document.body && !la.current?.contains(L) ? L : null;
-    (M || ie || ul.current || document.querySelector(".tab.active"))?.setAttribute("data-context-return", "true");
+    const L = document.activeElement, le = L instanceof HTMLElement && L !== document.body && !la.current?.contains(L) ? L : null;
+    (D || le || ul.current || document.querySelector(".tab.active"))?.setAttribute("data-context-return", "true");
   }
-  function Kt(M, L) {
-    rt(L), le({ kind: "item", item: M });
+  function Kt(D, L) {
+    rt(L), ne({ kind: "item", item: D });
   }
-  function vt(M, L, ie) {
-    rt(L), le({ kind: "day", date: M, items: ie });
+  function vt(D, L, le) {
+    rt(L), ne({ kind: "day", date: D, items: le });
   }
-  function Bu(M) {
-    rt(M), le({ kind: "system" });
+  function Bu(D) {
+    rt(D), ne({ kind: "system" });
   }
   function jn() {
-    const M = /* @__PURE__ */ Symbol("workbench-operation");
-    return fa.current.add(M), y(!0), M;
+    const D = /* @__PURE__ */ Symbol("workbench-operation");
+    return fa.current.add(D), y(!0), D;
   }
-  function Sn(M) {
-    fa.current.delete(M), y(fa.current.size > 0);
+  function Sn(D) {
+    fa.current.delete(D), y(fa.current.size > 0);
   }
   function ha() {
     st.current.invalidate(), be(null);
   }
-  function Ml(M) {
-    st.current.invalidate(), be(M);
+  function Ml(D) {
+    st.current.invalidate(), be(D);
   }
   function Ol() {
     da(document.querySelector(".ai-action-button")), Oe(null), B({ text: "", nonce: Date.now() }), ha(), V(!0);
   }
-  function ia(M) {
-    da(), Oe(null), B({ text: M, nonce: Date.now() }), ha(), V(!0);
+  function ia(D) {
+    da(), Oe(null), B({ text: D, nonce: Date.now() }), ha(), V(!0);
   }
-  function rl(M) {
-    da(), Oe(M), ha(), V(!0);
+  function rl(D) {
+    da(), Oe(D), ha(), V(!0);
   }
   function ua() {
     if (_e.current && window.history.state?.laosuActionDrawer) {
@@ -11608,13 +11608,13 @@ function Zy() {
       window.history.back();
       return;
     }
-    Ut.current = !1, le(null);
+    Ut.current = !1, ne(null);
   }
-  async function pi(M, L) {
-    if (!D) {
+  async function pi(D, L) {
+    if (!M) {
       X(L.id);
       try {
-        const ie = M === "courseCancel" ? await lt("api/courses/cancel", {
+        const le = D === "courseCancel" ? await lt("api/courses/cancel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ student: L.title, date: L.start_at?.slice(0, 10), time: L.start_at?.slice(11, 16), reason: "没上" })
@@ -11623,96 +11623,101 @@ function Zy() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: L.id, expectedVersion: L.version })
         });
-        if (!ie.ok) throw new Error(ie.error || "处理未完成");
-        M === "affairComplete" ? (oe((se) => ({ ...se, [L.id]: { ok: !0, text: ie.message || "已完成", buttonLabel: "已完成" } })), h(`${L.title} 已完成`)) : h(`${L.title} ${L.start_at?.slice(5, 16) ?? ""} 已记录没上`), await Zt(N);
-      } catch (ie) {
-        M === "affairComplete" && oe((se) => ({ ...se, [L.id]: { ok: !1, text: `处理失败：${ie.message || "未知错误"}` } })), h(`处理失败：${ie.message || "未知错误"}`);
+        if (!le.ok) throw new Error(le.error || "处理未完成");
+        D === "affairComplete" ? (oe((se) => ({ ...se, [L.id]: { ok: !0, text: le.message || "已完成", buttonLabel: "已完成" } })), h(`${L.title} 已完成`)) : h(`${L.title} ${L.start_at?.slice(5, 16) ?? ""} 已记录没上`), await Zt(N);
+      } catch (le) {
+        D === "affairComplete" && oe((se) => ({ ...se, [L.id]: { ok: !1, text: `处理失败：${le.message || "未知错误"}` } })), h(`处理失败：${le.message || "未知错误"}`);
       } finally {
         X(null);
       }
     }
   }
-  async function ol(M = {}) {
-    const L = M.silent === !0;
+  async function ol(D = {}) {
+    const L = D.silent === !0;
     if (!(!L && Ot.current)) {
       L || (Ot.current = !0, F(!0), h("正在刷新数据…"));
       try {
-        const ie = await Zt(N, { ...M, silent: !0, fresh: !L, preserveOnError: !L });
-        ie === !0 ? (oe({}), G(null), ge((se) => se + 1), L || h("本地课程与事务数据已刷新")) : ie === !1 && !L ? h(`刷新未完成，已保留当前数据：${mt.current || "读取失败"}`) : ie === null && !L && h("视图已切换，当前页面正在读取最新数据");
+        const le = await Zt(N, {
+          ...D,
+          silent: !0,
+          fresh: D.fresh ?? !L,
+          preserveOnError: D.preserveOnError ?? !L
+        });
+        return le === !0 ? (oe({}), G(null), ge((se) => se + 1), L || h("本地课程与事务数据已刷新")) : le === !1 && !L ? h(`刷新未完成，已保留当前数据：${mt.current || "读取失败"}`) : le === null && !L && h("视图已切换，当前页面正在读取最新数据"), le;
       } finally {
         L || (Ot.current = !1, F(!1));
       }
     }
   }
-  async function fl(M) {
-    const L = st.current.begin(), ie = jn();
+  async function fl(D) {
+    const L = st.current.begin(), le = jn();
     be(null);
     try {
       const se = await lt("api/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(M)
+        body: JSON.stringify(D)
       });
       if (!st.current.isCurrent(L)) return;
-      be({ ...se, operation: String(M.operation || ""), input: M });
+      be({ ...se, operation: String(D.operation || ""), input: D });
     } catch (se) {
       st.current.isCurrent(L) && be({ ok: !1, error: se.message });
     } finally {
-      Sn(ie);
+      Sn(le);
     }
   }
-  async function ku(M) {
-    if (!D) {
-      X(M.id), oe((L) => ({ ...L, [M.id]: { ok: !0, text: "已收到“没约上”，正在后台预演并安排下一次…", buttonLabel: "处理中…" } }));
+  async function ku(D) {
+    if (!M) {
+      X(D.id), oe((L) => ({ ...L, [D.id]: { ok: !0, text: "已收到“没约上”，正在后台预演并安排下一次…", buttonLabel: "处理中…" } }));
       try {
         const L = await lt("api/affairs/retry-next", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: M.id, expectedVersion: M.version })
+          body: JSON.stringify({ id: D.id, expectedVersion: D.version })
         });
         if (!L.ok) throw new Error(L.error || "没约上的处理未完成");
-        const ie = L.outcome?.candidateDate, se = ie ? `已安排 ${ie.slice(5)}` : "已处理";
-        oe((fe) => ({ ...fe, [M.id]: {
+        const le = L.outcome?.candidateDate, se = le ? `已安排 ${le.slice(5)}` : "已处理";
+        oe((fe) => ({ ...fe, [D.id]: {
           ok: !0,
           text: L.message || "已推进到下一次尝试",
           buttonLabel: se,
           undo: L.outcome ? { expectedVersion: L.outcome.version } : void 0
         } })), await Zt(N);
       } catch (L) {
-        const ie = L.message || "没约上的处理失败";
-        oe((se) => ({ ...se, [M.id]: { ok: !1, text: `处理失败：${ie}`, buttonLabel: "重试" } }));
+        const le = L.message || "没约上的处理失败";
+        oe((se) => ({ ...se, [D.id]: { ok: !1, text: `处理失败：${le}`, buttonLabel: "重试" } }));
       } finally {
         X(null);
       }
     }
   }
-  async function bi(M) {
-    if (D) return;
-    const L = K[M.id]?.undo;
-    X(M.id), oe((ie) => ({ ...ie, [M.id]: { ok: !0, text: "正在恢复上一候选日…", buttonLabel: "处理中…" } }));
+  async function bi(D) {
+    if (M) return;
+    const L = K[D.id]?.undo;
+    X(D.id), oe((le) => ({ ...le, [D.id]: { ok: !0, text: "正在恢复上一候选日…", buttonLabel: "处理中…" } }));
     try {
-      const ie = await lt("api/affairs/retry-prev", {
+      const le = await lt("api/affairs/retry-prev", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: M.id, expectedVersion: L?.expectedVersion ?? M.version })
+        body: JSON.stringify({ id: D.id, expectedVersion: L?.expectedVersion ?? D.version })
       });
-      if (!ie.ok) throw new Error(ie.error || "恢复上一候选日未完成");
-      const se = ie.outcome?.candidateDate;
-      oe((fe) => ({ ...fe, [M.id]: {
+      if (!le.ok) throw new Error(le.error || "恢复上一候选日未完成");
+      const se = le.outcome?.candidateDate;
+      oe((fe) => ({ ...fe, [D.id]: {
         ok: !0,
-        text: ie.message || "已恢复到上一候选日",
+        text: le.message || "已恢复到上一候选日",
         buttonLabel: se ? `回到 ${se.slice(5)}` : "已恢复"
       } })), await Zt(N);
-    } catch (ie) {
-      const se = ie.message || "恢复上一候选日失败";
-      oe((fe) => ({ ...fe, [M.id]: { ok: !1, text: `恢复失败：${se}`, buttonLabel: "重试" } }));
+    } catch (le) {
+      const se = le.message || "恢复上一候选日失败";
+      oe((fe) => ({ ...fe, [D.id]: { ok: !1, text: `恢复失败：${se}`, buttonLabel: "重试" } }));
     } finally {
       X(null);
     }
   }
   async function xi() {
     if (!ae?.token || !ae.canCommit) return;
-    const M = st.current.begin(), L = jn(), ie = ae.operation || De?.operation;
+    const D = st.current.begin(), L = jn(), le = ae.operation || De?.operation;
     try {
       const se = await lt("api/commit", {
         method: "POST",
@@ -11720,20 +11725,20 @@ function Zy() {
         body: JSON.stringify({ token: ae.token })
       }), fe = { ok: se.ok, summary: se.summary, message: `${se.message || ""}${se.exportMessage ? `
 导出：${se.exportMessage}` : ""}${se.syncMessage ? `
-日历：${se.syncMessage}` : ""}`, result: se, operation: ie, input: ae.input, committed: !!se.ok };
-      await Zt(N), ge((me) => me + 1), st.current.isCurrent(M) && be(fe);
+日历：${se.syncMessage}` : ""}`, result: se, operation: le, input: ae.input, committed: !!se.ok };
+      await Zt(N), ge((me) => me + 1), st.current.isCurrent(D) && be(fe);
     } catch (se) {
-      st.current.isCurrent(M) && be({ ok: !1, error: se.message });
+      st.current.isCurrent(D) && be({ ok: !1, error: se.message });
     } finally {
       Sn(L);
     }
   }
   async function ji() {
-    const M = ae?.batchItems ?? [];
-    if (!M.length) return;
-    const L = st.current.begin(), ie = jn(), se = /* @__PURE__ */ new Map();
+    const D = ae?.batchItems ?? [];
+    if (!D.length) return;
+    const L = st.current.begin(), le = jn(), se = /* @__PURE__ */ new Map();
     try {
-      for (const fe of M) {
+      for (const fe of D) {
         if (!fe.canCommit) {
           se.set(fe.token, { ok: !1, message: "预演未通过，已跳过" });
           continue;
@@ -11752,27 +11757,27 @@ function Zy() {
       }
       await Zt(N), ge((fe) => fe + 1), st.current.isCurrent(L) && ae && be({
         ...ae,
-        ok: M.every((fe) => se.get(fe.token)?.ok === !0),
+        ok: D.every((fe) => se.get(fe.token)?.ok === !0),
         committed: !0,
-        message: M.map((fe) => {
+        message: D.map((fe) => {
           const me = se.get(fe.token);
           return `${me?.ok ? "✓" : me ? "✗" : "·"} ${fe.summary}：${me?.message || "未执行"}`;
         }).join(`
 `),
-        batchItems: M.map((fe) => {
+        batchItems: D.map((fe) => {
           const me = se.get(fe.token);
           return { ...fe, canCommit: !1, resultOk: me?.ok ?? !1, message: me?.message || "未执行" };
         })
       });
     } finally {
-      Sn(ie);
+      Sn(le);
     }
   }
   return /* @__PURE__ */ i.jsx(Ay, { mode: "inherit", className: "workbench-theme", children: /* @__PURE__ */ i.jsxs("div", { className: "workbench-shell", "data-ui": "workbench-shell", "data-ui-id": "workbench-main", children: [
     /* @__PURE__ */ i.jsxs("header", { className: "topbar", "data-ui": "topbar", children: [
-      /* @__PURE__ */ i.jsx("nav", { className: "tabbar", "aria-label": "日程视图", "data-ui": "primary-navigation", children: Object.keys(Th).map((M) => /* @__PURE__ */ i.jsx("button", { type: "button", className: N === M ? "tab active" : "tab", "data-ui-role": "nav-item", "data-ui-id": `nav-${M}`, "aria-current": N === M ? "page" : void 0, disabled: pe, onClick: () => {
-        Hu(M);
-      }, children: Th[M] }, M)) }),
+      /* @__PURE__ */ i.jsx("nav", { className: "tabbar", "aria-label": "日程视图", "data-ui": "primary-navigation", children: Object.keys(Th).map((D) => /* @__PURE__ */ i.jsx("button", { type: "button", className: N === D ? "tab active" : "tab", "data-ui-role": "nav-item", "data-ui-id": `nav-${D}`, "aria-current": N === D ? "page" : void 0, disabled: pe, onClick: () => {
+        Hu(D);
+      }, children: Th[D] }, D)) }),
       /* @__PURE__ */ i.jsxs("div", { className: "top-actions", "data-ui": "top-actions", children: [
         /* @__PURE__ */ i.jsxs("div", { className: "view-scale-control", role: "group", "aria-label": "页面缩放", children: [
           /* @__PURE__ */ i.jsx("button", { type: "button", onClick: () => cl(-1), disabled: Q <= 0.7, "aria-label": "缩小页面", children: "−" }),
@@ -11781,7 +11786,7 @@ function Zy() {
         ] }),
         /* @__PURE__ */ i.jsx("button", { type: "button", className: ve ? "ai-action-button active" : "ai-action-button", "data-ui-role": "button", "data-ui-variant": "secondary", "data-ui-id": "open-ai", onClick: Ol, "aria-expanded": ve, children: "✦ AI 操作" }),
         /* @__PURE__ */ i.jsx("span", { className: "updated-at", children: Qy($?.observedAt) }),
-        /* @__PURE__ */ i.jsxs("button", { type: "button", className: `${$?.health?.ok ? "health good" : "health bad"} health-button${ce?.kind === "system" ? " active" : ""}`, "data-ui-role": "button", "data-ui-variant": "secondary", "data-ui-id": "open-system-status", onClick: (M) => Bu(M.currentTarget), "aria-expanded": ce?.kind === "system", children: [
+        /* @__PURE__ */ i.jsxs("button", { type: "button", className: `${$?.health?.ok ? "health good" : "health bad"} health-button${ce?.kind === "system" ? " active" : ""}`, "data-ui-role": "button", "data-ui-variant": "secondary", "data-ui-id": "open-system-status", onClick: (D) => Bu(D.currentTarget), "aria-expanded": ce?.kind === "system", children: [
           /* @__PURE__ */ i.jsx("i", {}),
           $?.health?.ok ? "系统正常" : "需要检查"
         ] }),
@@ -11801,11 +11806,11 @@ function Zy() {
       /* @__PURE__ */ i.jsxs("div", { className: pe && $ ? "view-content scope-loading" : "view-content", "aria-busy": pe && !!$, inert: pe && !!$, children: [
         $ && p === "overview" && /* @__PURE__ */ i.jsx(Ky, { dashboard: $, onInspect: Kt, onOpenDay: vt }),
         p === "planning" && /* @__PURE__ */ i.jsx(eg, { onAction: rl, onAskAi: ia, refreshKey: He, sectionHint: W, scheduleText: $?.scheduleText, onDataChanged: ol }),
-        p === "affairs" && /* @__PURE__ */ i.jsx(ng, { onQuick: pi, onAskAi: ia, onPrepare: rl, onInspect: Kt, onRetry: ku, onRetryPrev: bi, retryingId: D, feedback: K, refreshKey: He, observedAt: $?.observedAt ?? "", onOpenDay: (M, L, ie) => vt(M, ie, L), localDate: $?.localDate })
+        p === "affairs" && /* @__PURE__ */ i.jsx(ng, { onQuick: pi, onAskAi: ia, onPrepare: rl, onInspect: Kt, onRetry: ku, onRetryPrev: bi, retryingId: M, feedback: K, refreshKey: He, observedAt: $?.observedAt ?? "", onOpenDay: (D, L, le) => vt(D, le, L), localDate: $?.localDate })
       ] })
     ] }),
-    /* @__PURE__ */ i.jsx("div", { className: "context-drawer-backdrop", hidden: !ne, onMouseDown: (M) => {
-      M.currentTarget === M.target && En();
+    /* @__PURE__ */ i.jsx("div", { className: "context-drawer-backdrop", hidden: !ie, onMouseDown: (D) => {
+      D.currentTarget === D.target && En();
     }, children: /* @__PURE__ */ i.jsxs("aside", { ref: la, className: "context-drawer", "data-ui": "drawer", "data-ui-id": "context-drawer", role: "dialog", "aria-modal": "true", "aria-label": "详情", children: [
       /* @__PURE__ */ i.jsxs("header", { className: "context-drawer-head", children: [
         /* @__PURE__ */ i.jsx("button", { type: "button", className: "context-back", onClick: En, "aria-label": "返回原位置", children: "←" }),
@@ -11817,8 +11822,8 @@ function Zy() {
       ] }),
       /* @__PURE__ */ i.jsx("div", { className: "context-drawer-body", children: ce && $ && /* @__PURE__ */ i.jsx(rg, { view: ce, dashboard: $ }) })
     ] }) }),
-    /* @__PURE__ */ i.jsx("div", { className: "action-drawer-backdrop", hidden: !ve, onMouseDown: (M) => {
-      M.currentTarget === M.target && ua();
+    /* @__PURE__ */ i.jsx("div", { className: "action-drawer-backdrop", hidden: !ve, onMouseDown: (D) => {
+      D.currentTarget === D.target && ua();
     }, children: /* @__PURE__ */ i.jsxs("aside", { ref: Qt, className: "action-drawer", "data-ui": "drawer", "data-ui-id": "ai-drawer", role: "dialog", "aria-modal": "true", "aria-label": "AI 操作", children: [
       /* @__PURE__ */ i.jsxs("header", { className: "action-drawer-head", children: [
         /* @__PURE__ */ i.jsx("button", { type: "button", className: "context-back", onClick: ua, "aria-label": "返回原位置", children: "←" }),
@@ -11961,14 +11966,14 @@ function Iy({ items: c, range: f, localDate: d, onInspect: o }) {
   const E = w.useMemo(() => ir(f, d), [f, d]), j = kh(), p = E, R = w.useMemo(() => {
     const V = /* @__PURE__ */ new Map();
     return c.forEach((ce) => {
-      const le = Uu(ce);
-      le && (le < d && ["已取消", "已调课", "cancelled"].includes(ce.status) || V.set(le, [...V.get(le) || [], ce]));
-    }), V.forEach((ce, le) => V.set(le, [...ce].sort((ne, $) => String(gt(ne) || "").localeCompare(String(gt($) || ""))))), V;
+      const ne = Uu(ce);
+      ne && (ne < d && ["已取消", "已调课", "cancelled"].includes(ce.status) || V.set(ne, [...V.get(ne) || [], ce]));
+    }), V.forEach((ce, ne) => V.set(ne, [...ce].sort((ie, $) => String(gt(ie) || "").localeCompare(String(gt($) || ""))))), V;
   }, [c, d]), N = w.useMemo(() => {
     const V = /* @__PURE__ */ new Map();
     for (const ce of E) {
-      const le = (R.get(ce) || []).filter((ne) => ne.start_at || ne.deadline_at);
-      V.set(ce, dr(le));
+      const ne = (R.get(ce) || []).filter((ie) => ie.start_at || ie.deadline_at);
+      V.set(ce, dr(ne));
     }
     return V;
   }, [R, E]), b = "36px repeat(7, minmax(0, 1fr))", U = c.filter((V) => V.start_at || V.deadline_at), { startHour: A, endHour: S } = qh(U), Y = 60, Q = (S - A) * Y, ve = Array.from({ length: S - A + 1 }, (V, ce) => A + ce);
@@ -11991,36 +11996,36 @@ function Iy({ items: c, range: f, localDate: d, onInspect: o }) {
       ] }, V)) }),
       p.map((V) => {
         const ce = N.get(V) || [];
-        return /* @__PURE__ */ i.jsx("div", { className: V === d ? "week-day-track today" : "week-day-track", style: { height: Q }, children: ce.map(({ item: le, lane: ne, laneCount: $ }) => {
-          const Ne = Hh(le, A, S, Y);
+        return /* @__PURE__ */ i.jsx("div", { className: V === d ? "week-day-track today" : "week-day-track", style: { height: Q }, children: ce.map(({ item: ne, lane: ie, laneCount: $ }) => {
+          const Ne = Hh(ne, A, S, Y);
           if (!Ne) return null;
-          const pe = 100 / $, Z = le.start_at || le.deadline_at, k = hr(le, d);
+          const pe = 100 / $, Z = ne.start_at || ne.deadline_at, k = hr(ne, d);
           return /* @__PURE__ */ i.jsxs(
             "article",
             {
-              className: `week-time-block ${le.domain} ${mr(le, d)}${vr(le) ? " temporary" : ""}`,
-              style: { top: Ne.top, height: Ne.height, left: `calc(${ne * pe}% + 4px)`, width: `calc(${pe}% - 8px)` },
+              className: `week-time-block ${ne.domain} ${mr(ne, d)}${vr(ne) ? " temporary" : ""}`,
+              style: { top: Ne.top, height: Ne.height, left: `calc(${ie * pe}% + 4px)`, width: `calc(${pe}% - 8px)` },
               tabIndex: 0,
               role: "button",
               onClick: (F) => {
-                F.target.closest("button") || o(le, F.currentTarget);
+                F.target.closest("button") || o(ne, F.currentTarget);
               },
               onKeyDown: (F) => {
-                (F.key === "Enter" || F.key === " ") && (F.preventDefault(), o(le, F.currentTarget));
+                (F.key === "Enter" || F.key === " ") && (F.preventDefault(), o(ne, F.currentTarget));
               },
-              "data-item-id": le.id,
-              "aria-label": `${Oa(Z)} ${le.title}${k ? "（已过期待标记）" : ""}，${le.domain === "course" ? `${le.duration || "—"} 分钟课程` : "事务"}，打开详情`,
+              "data-item-id": ne.id,
+              "aria-label": `${Oa(Z)} ${ne.title}${k ? "（已过期待标记）" : ""}，${ne.domain === "course" ? `${ne.duration || "—"} 分钟课程` : "事务"}，打开详情`,
               children: [
                 /* @__PURE__ */ i.jsxs("strong", { children: [
                   Oa(Z),
                   " · ",
-                  le.title,
+                  ne.title,
                   k ? "（过期）" : ""
                 ] }),
-                /* @__PURE__ */ i.jsx("span", { children: le.domain === "course" ? `${le.duration || "—"} 分钟 · 课程` : le.estimated_minutes ? `${le.estimated_minutes} 分钟 · 事务` : "事务" })
+                /* @__PURE__ */ i.jsx("span", { children: ne.domain === "course" ? `${ne.duration || "—"} 分钟 · 课程` : ne.estimated_minutes ? `${ne.estimated_minutes} 分钟 · 事务` : "事务" })
               ]
             },
-            le.id
+            ne.id
           );
         }) }, V);
       })
@@ -12187,7 +12192,7 @@ function Py({ onAction: c, onAskAi: f, refreshKey: d = 0 }) {
   ] });
 }
 function eg({ onAction: c, onAskAi: f, refreshKey: d, sectionHint: o, scheduleText: E, onDataChanged: j }) {
-  const [p, R] = w.useState(() => yi("planning")), [N, b] = w.useState(""), [U, A] = w.useState("calendar"), [S, Y] = w.useState("issues"), [Q, ve] = w.useState(!1), [V, ce] = w.useState(null), [le, ne] = w.useState(!1), [$, Ne] = w.useState(null), [pe, Z] = w.useState({});
+  const [p, R] = w.useState(() => yi("planning")), [N, b] = w.useState(""), [U, A] = w.useState("calendar"), [S, Y] = w.useState("issues"), [Q, ve] = w.useState(!1), [V, ce] = w.useState(null), [ne, ie] = w.useState(!1), [$, Ne] = w.useState(null), [pe, Z] = w.useState({});
   w.useEffect(() => {
     o?.section && A(o.section);
   }, [o?.nonce]), w.useEffect(() => {
@@ -12206,21 +12211,21 @@ function eg({ onAction: c, onAskAi: f, refreshKey: d, sectionHint: o, scheduleTe
     if (!y || !y[1].ok || $ === y[0]) return;
     const P = window.setTimeout(() => {
       Z((h) => {
-        const D = { ...h };
-        return delete D[y[0]], D;
+        const M = { ...h };
+        return delete M[y[0]], M;
       });
     }, 4500);
     return () => window.clearTimeout(P);
   }, [$, pe]);
   async function k() {
-    if (!(!p || le)) {
-      ne(!0), ce(null);
+    if (!(!p || ne)) {
+      ie(!0), ce(null);
       try {
         ce(await lt(`api/planning/template-check?monday=${encodeURIComponent(p.weekMonday)}`));
       } catch (y) {
         ce({ ok: !1, passed: !1, monday: p.weekMonday, output: "", affectedDates: [], error: y.message });
       } finally {
-        ne(!1);
+        ie(!1);
       }
     }
   }
@@ -12236,7 +12241,7 @@ function eg({ onAction: c, onAskAi: f, refreshKey: d, sectionHint: o, scheduleTe
         if (!P.ok) throw new Error(P.error || "取消预留未完成");
         R((h) => h && {
           ...h,
-          reservations: h.reservations.map((D) => D.reservation_id === y ? { ...D, status: "已取消" } : D)
+          reservations: h.reservations.map((M) => M.reservation_id === y ? { ...M, status: "已取消" } : M)
         }), Z((h) => ({ ...h, [y]: { ok: !0, text: P.message || "已取消预留" } })), j({ silent: !0 });
       } catch (P) {
         Z((h) => ({ ...h, [y]: { ok: !1, text: `取消失败：${P.message || "未知错误"}` } }));
@@ -12258,10 +12263,10 @@ function eg({ onAction: c, onAskAi: f, refreshKey: d, sectionHint: o, scheduleTe
         R((h) => h && {
           ...h,
           summary: { ...h.summary, formalCourseCount: h.summary.formalCourseCount + 1 },
-          reservations: h.reservations.map((D) => D.reservation_id === y ? { ...D, status: "已确认" } : D),
+          reservations: h.reservations.map((M) => M.reservation_id === y ? { ...M, status: "已确认" } : M),
           audit: {
             ...h.audit,
-            reservation_hard_blockers: h.audit.reservation_hard_blockers.filter((D) => D.reservation_id !== y)
+            reservation_hard_blockers: h.audit.reservation_hard_blockers.filter((M) => M.reservation_id !== y)
           }
         }), Z((h) => ({ ...h, [y]: { ok: !0, text: P.message || "已确认落课" } })), j({ silent: !0 });
       } catch (P) {
@@ -12457,7 +12462,7 @@ function eg({ onAction: c, onAskAi: f, refreshKey: d, sectionHint: o, scheduleTe
       /* @__PURE__ */ i.jsxs("div", { className: "panel planning-reservations-panel", children: [
         /* @__PURE__ */ i.jsx(ea, { title: "课程预留", meta: `${p.reservations.length} 条`, action: "新增预留…", onAction: () => c({ operation: "reservation_add" }) }),
         p.reservations.length ? /* @__PURE__ */ i.jsx("div", { className: "reservation-card-list", children: p.reservations.map((y) => {
-          const P = (y.conflicts?.formal_courses?.length || 0) + (y.conflicts?.soft_reservations?.length || 0), h = Oe.get(y.reservation_id) || [], D = `reservation-blocker-${y.reservation_id}`, X = y.status === "已确认" ? "已落课" : y.status === "预期" ? "待落课" : y.status, K = h.length ? "blocked" : y.status === "已确认" ? "landed" : "expected";
+          const P = (y.conflicts?.formal_courses?.length || 0) + (y.conflicts?.soft_reservations?.length || 0), h = Oe.get(y.reservation_id) || [], M = `reservation-blocker-${y.reservation_id}`, X = y.status === "已确认" ? "已落课" : y.status === "预期" ? "待落课" : y.status, K = h.length ? "blocked" : y.status === "已确认" ? "landed" : "expected";
           return /* @__PURE__ */ i.jsxs("article", { className: `reservation-card ${K}`, children: [
             /* @__PURE__ */ i.jsxs("div", { className: "reservation-date", children: [
               /* @__PURE__ */ i.jsx("strong", { children: y.reservation_date.slice(5) }),
@@ -12474,7 +12479,7 @@ function eg({ onAction: c, onAskAi: f, refreshKey: d, sectionHint: o, scheduleTe
                 " 分钟",
                 y.zone ? ` · ${y.zone}` : ""
               ] }),
-              /* @__PURE__ */ i.jsxs("small", { id: D, children: [
+              /* @__PURE__ */ i.jsxs("small", { id: M, children: [
                 X,
                 P ? ` · ${P} 项软冲突` : "",
                 h.length ? ` · 硬约束：${h.join("、")}` : "",
@@ -12483,7 +12488,7 @@ function eg({ onAction: c, onAskAi: f, refreshKey: d, sectionHint: o, scheduleTe
             ] }),
             /* @__PURE__ */ i.jsx("div", { className: "reservation-actions", children: y.status === "预期" ? /* @__PURE__ */ i.jsxs(i.Fragment, { children: [
               /* @__PURE__ */ i.jsx("button", { type: "button", "data-ui-role": "button", "data-ui-variant": "secondary", "data-ui-action": "reservation-update", onClick: () => c({ operation: "reservation_update", reservationId: y.reservation_id, date: y.reservation_date, time: y.start_time, duration: y.duration, zone: y.zone || "", note: y.note || "" }), children: "调时间" }),
-              /* @__PURE__ */ i.jsx("button", { type: "button", className: "primary", disabled: h.length > 0, "aria-describedby": h.length ? D : void 0, onClick: () => c({ operation: "reservation_confirm", reservationId: y.reservation_id }), children: h.length ? "暂不可落课" : "确认落课" }),
+              /* @__PURE__ */ i.jsx("button", { type: "button", className: "primary", disabled: h.length > 0, "aria-describedby": h.length ? M : void 0, onClick: () => c({ operation: "reservation_confirm", reservationId: y.reservation_id }), children: h.length ? "暂不可落课" : "确认落课" }),
               /* @__PURE__ */ i.jsx("button", { type: "button", className: "quiet-danger", onClick: () => c({ operation: "reservation_cancel", reservationId: y.reservation_id }), children: "取消预留" })
             ] }) : /* @__PURE__ */ i.jsxs("span", { className: "reservation-state-chip confirmed", children: [
               "✓ ",
@@ -12502,9 +12507,9 @@ function eg({ onAction: c, onAskAi: f, refreshKey: d, sectionHint: o, scheduleTe
               " 条模板 · 通勤只作排时间提示"
             ] })
           ] }),
-          /* @__PURE__ */ i.jsx("button", { type: "button", className: "row-action-button", disabled: le, onClick: () => {
+          /* @__PURE__ */ i.jsx("button", { type: "button", className: "row-action-button", disabled: ne, onClick: () => {
             k();
-          }, children: le ? "正在预演…" : "预演本周模板" })
+          }, children: ne ? "正在预演…" : "预演本周模板" })
         ] }),
         /* @__PURE__ */ i.jsxs("div", { className: "template-issue-list", children: [
           /* @__PURE__ */ i.jsx(tr, { label: "时间重叠", count: p.commute.overlaps.length, tone: "danger", details: p.commute.overlaps.slice(0, 3).map((y) => `${y.weekday} ${y.first} ${y.firstRange} / ${y.second} ${y.secondRange}`) }),
@@ -12585,9 +12590,9 @@ ${E}` : ""
   ] });
 }
 function tg({ planning: c, hidden: f, onConfirmReservation: d, onCancelReservation: o, onAction: E, confirmingReservationId: j, reservationFeedback: p }) {
-  const [R, N] = w.useState("reservation"), [b, U] = w.useState(null), A = kh(), [S, Y] = w.useState(c.weekMonday), [Q, ve] = w.useState(0), [V, ce] = w.useState(null), le = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"], ne = w.useMemo(() => ir(`${S}..${S}`, S), [S]), { visibleDays: $, paginated: Ne } = Wy(A.ref, !!V), pe = Math.max(1, Math.ceil(7 / Math.max(1, $))), Z = w.useMemo(
-    () => V ? [V] : Ne ? wy(ne, Q, $) : ne,
-    [ne, Q, V, Ne, $]
+  const [R, N] = w.useState("reservation"), [b, U] = w.useState(null), A = kh(), [S, Y] = w.useState(c.weekMonday), [Q, ve] = w.useState(0), [V, ce] = w.useState(null), ne = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"], ie = w.useMemo(() => ir(`${S}..${S}`, S), [S]), { visibleDays: $, paginated: Ne } = Wy(A.ref, !!V), pe = Math.max(1, Math.ceil(7 / Math.max(1, $))), Z = w.useMemo(
+    () => V ? [V] : Ne ? wy(ie, Q, $) : ie,
+    [ie, Q, V, Ne, $]
   );
   w.useEffect(() => {
     Y(c.weekMonday);
@@ -12602,7 +12607,7 @@ function tg({ planning: c, hidden: f, onConfirmReservation: d, onCancelReservati
       start_at: `${ge.date}T${ge.start_time}:00+08:00`,
       end_at: `${ge.date}T${ge.end_time}:00+08:00`
     });
-    return R === "reservation" ? c.reservations.filter((ge) => ge.reservation_date >= ne[0] && ge.reservation_date <= ne[6] && ge.status !== "已取消").map((ge) => {
+    return R === "reservation" ? c.reservations.filter((ge) => ge.reservation_date >= ie[0] && ge.reservation_date <= ie[6] && ge.status !== "已取消").map((ge) => {
       const W = De.get(ge.reservation_id), ta = (ge.student_status || "在读") !== "在读", $e = ge.status === "已确认";
       return He({
         id: ge.reservation_id,
@@ -12623,9 +12628,9 @@ function tg({ planning: c, hidden: f, onConfirmReservation: d, onCancelReservati
         note: ge.note
       });
     }) : c.templates.flatMap((ge) => {
-      const W = le.indexOf(ge.weekday);
+      const W = ne.indexOf(ge.weekday);
       if (W < 0) return [];
-      const ta = ne[W], $e = G(ge.student, ge.student_status);
+      const ta = ie[W], $e = G(ge.student, ge.student_status);
       return [He({
         id: `template-${ge.template_id}`,
         kind: "template",
@@ -12639,7 +12644,7 @@ function tg({ planning: c, hidden: f, onConfirmReservation: d, onCancelReservati
         stateClass: $e.stateClass
       })];
     });
-  }, [ne, R, be, c.reservations, c.templates, De, ae]);
+  }, [ie, R, be, c.reservations, c.templates, De, ae]);
   w.useEffect(() => {
     b && !Oe.some((G) => G.id === b && G.kind === "reservation") && U(null);
   }, [Oe, b]), w.useEffect(() => {
@@ -12658,14 +12663,14 @@ function tg({ planning: c, hidden: f, onConfirmReservation: d, onCancelReservati
   const g = !!j, B = w.useMemo(() => {
     const G = /* @__PURE__ */ new Map();
     return Oe.forEach((He) => G.set(He.date, [...G.get(He.date) || [], He])), G;
-  }, [Oe]), I = w.useMemo(() => new Map(ne.map((G) => [G, Jy(B.get(G) || [])])), [B, ne]), y = w.useMemo(() => {
+  }, [Oe]), I = w.useMemo(() => new Map(ie.map((G) => [G, Jy(B.get(G) || [])])), [B, ie]), y = w.useMemo(() => {
     const G = /* @__PURE__ */ new Map();
-    for (const He of ne)
+    for (const He of ie)
       G.set(He, dr(B.get(He) || []));
     return G;
-  }, [B, ne]), P = Z.map((G) => G && I.get(G) || 1);
+  }, [B, ie]), P = Z.map((G) => G && I.get(G) || 1);
   P.reduce((G, He) => G + He, 0);
-  const h = `52px ${P.map((G) => `minmax(0, ${G}fr)`).join(" ")}`, D = Z.length >= 7 ? Oe : Oe.filter((G) => Z.includes(G.date)), { startHour: X, endHour: K } = qh(D), oe = V ? 92 : $ >= 6 ? 64 : $ >= 4 ? 72 : 84, je = (K - X) * oe, Me = Array.from({ length: K - X + 1 }, (G, He) => X + He), nt = `${Pt(`${ne[0]}T12:00:00+08:00`, { month: "long", day: "numeric" })}—${Pt(`${ne[6]}T12:00:00+08:00`, { month: "long", day: "numeric" })}`;
+  const h = `52px ${P.map((G) => `minmax(0, ${G}fr)`).join(" ")}`, M = Z.length >= 7 ? Oe : Oe.filter((G) => Z.includes(G.date)), { startHour: X, endHour: K } = qh(M), oe = V ? 92 : $ >= 6 ? 64 : $ >= 4 ? 72 : 84, je = (K - X) * oe, Me = Array.from({ length: K - X + 1 }, (G, He) => X + He), nt = `${Pt(`${ie[0]}T12:00:00+08:00`, { month: "long", day: "numeric" })}—${Pt(`${ie[6]}T12:00:00+08:00`, { month: "long", day: "numeric" })}`;
   return /* @__PURE__ */ i.jsxs("section", { className: `panel planning-week-panel ${R}-mode`, hidden: f, "aria-label": "筹备周视图", children: [
     /* @__PURE__ */ i.jsxs("div", { className: "planning-week-toolbar", children: [
       /* @__PURE__ */ i.jsxs("div", { children: [
@@ -12751,7 +12756,7 @@ function tg({ planning: c, hidden: f, onConfirmReservation: d, onCancelReservati
       /* @__PURE__ */ i.jsxs("div", { className: "planning-week-header", style: { gridTemplateColumns: h }, children: [
         /* @__PURE__ */ i.jsx("div", { className: "planning-week-corner", children: "时间" }),
         Z.map((G, He) => G ? /* @__PURE__ */ i.jsxs("button", { type: "button", className: G === c.localDate ? "planning-week-day-header today" : "planning-week-day-header", onClick: () => ce(G), "aria-label": `聚焦到 ${Pt(`${G}T12:00:00+08:00`, { month: "long", day: "numeric", weekday: "long" })} 的单日视图`, children: [
-          /* @__PURE__ */ i.jsx("span", { children: le[ne.indexOf(G)] }),
+          /* @__PURE__ */ i.jsx("span", { children: ne[ie.indexOf(G)] }),
           /* @__PURE__ */ i.jsx("strong", { children: Number(G.slice(8, 10)) }),
           /* @__PURE__ */ i.jsxs("small", { children: [
             B.get(G)?.length || 0,
@@ -12900,7 +12905,7 @@ function lg({ item: c, onInspect: f, onPrepare: d, onQuick: o, onAskAi: E, onRet
   );
 }
 function ng({ onPrepare: c, onQuick: f, onAskAi: d, onInspect: o, onRetry: E, onRetryPrev: j, retryingId: p, feedback: R, refreshKey: N, observedAt: b, onOpenDay: U, localDate: A }) {
-  const [S, Y] = w.useState("pending"), [Q, ve] = w.useState("list"), [V, ce] = w.useState(() => yi("affairs-month")), [le, ne] = w.useState(""), $ = w.useCallback((g) => {
+  const [S, Y] = w.useState("pending"), [Q, ve] = w.useState("list"), [V, ce] = w.useState(() => yi("affairs-month")), [ne, ie] = w.useState(""), $ = w.useCallback((g) => {
     lt("api/affairs-month" + (g ? "?fresh=1" : "")).then((B) => {
       if (!B || !Array.isArray(B.affairs) || !Array.isArray(B.pending)) return;
       const I = {
@@ -12908,7 +12913,7 @@ function ng({ onPrepare: c, onQuick: f, onAskAi: d, onInspect: o, onRetry: E, on
         pending: B.pending.map((y) => ({ ...y, domain: "affair" })),
         month: String(B.month || "")
       };
-      ce(I), Ru("affairs-month", I), ne("");
+      ce(I), Ru("affairs-month", I), ie("");
     }).catch(() => {
     });
   }, []);
@@ -12930,7 +12935,7 @@ function ng({ onPrepare: c, onQuick: f, onAskAi: d, onInspect: o, onRetry: E, on
   }
   return /* @__PURE__ */ i.jsxs("div", { className: "view-stack", children: [
     /* @__PURE__ */ i.jsx(gi, { eyebrow: `事务 · 本月 ${V?.month?.slice(5) || ""}`, title: "办事队列", description: `这个月办了 ${re} 件、取消 ${F.length - re} 件，进行中 ${k.length} 件。点日历上的任何一天，看那天的安排。` }),
-    le && /* @__PURE__ */ i.jsx(Dl, { tone: "error", title: "事务数据读取失败", text: le }),
+    ne && /* @__PURE__ */ i.jsx(Dl, { tone: "error", title: "事务数据读取失败", text: ne }),
     !V && /* @__PURE__ */ i.jsx(yr, {}),
     V && /* @__PURE__ */ i.jsxs(i.Fragment, { children: [
       /* @__PURE__ */ i.jsxs("div", { className: "affairs-toolbar", children: [
@@ -12962,12 +12967,12 @@ function ng({ onPrepare: c, onQuick: f, onAskAi: d, onInspect: o, onRetry: E, on
   ] });
 }
 function ig({ pending: c, students: f, preset: d, aiDraft: o, preview: E, busy: j, onPreview: p, onAiPreview: R, onCommit: N, onCommitBatch: b, onClear: U, onClose: A }) {
-  const [S, Y] = w.useState(d?.operation || "course_move"), [Q, ve] = w.useState(d?.affairKind || "timed"), [V, ce] = w.useState(d?.student || ""), [le, ne] = w.useState(d?.duration || ""), [$, Ne] = w.useState([
+  const [S, Y] = w.useState(d?.operation || "course_move"), [Q, ve] = w.useState(d?.affairKind || "timed"), [V, ce] = w.useState(d?.student || ""), [ne, ie] = w.useState(d?.duration || ""), [$, Ne] = w.useState([
     { operation: "course_move" },
     { operation: "course_move" }
   ]);
   w.useEffect(() => {
-    d?.operation && Y(d.operation), d?.affairKind && ve(d.affairKind), d?.student && ce(d.student), d?.duration && ne(d.duration);
+    d?.operation && Y(d.operation), d?.affairKind && ve(d.affairKind), d?.student && ce(d.student), d?.duration && ie(d.duration);
   }, [d]);
   function pe(k) {
     k.preventDefault();
@@ -13049,7 +13054,7 @@ function ig({ pending: c, students: f, preset: d, aiDraft: o, preview: E, busy: 
                   value: V,
                   onChange: (k) => {
                     const F = f.find((re) => re.name === k.target.value);
-                    ce(k.target.value), F && ne(F.default_duration);
+                    ce(k.target.value), F && ie(F.default_duration);
                   },
                   children: [
                     /* @__PURE__ */ i.jsx("option", { value: "", disabled: !0, children: "选择在读学生" }),
@@ -13067,7 +13072,7 @@ function ig({ pending: c, students: f, preset: d, aiDraft: o, preview: E, busy: 
             /* @__PURE__ */ i.jsx(de, { name: "time", label: "时间", type: "time", defaultValue: d?.time, required: !0 }),
             /* @__PURE__ */ i.jsxs("label", { className: "field", children: [
               /* @__PURE__ */ i.jsx("span", { children: "时长" }),
-              /* @__PURE__ */ i.jsx("input", { name: "duration", type: "number", min: "1", max: "480", value: le, onChange: (k) => ne(k.target.value), required: !0 })
+              /* @__PURE__ */ i.jsx("input", { name: "duration", type: "number", min: "1", max: "480", value: ne, onChange: (k) => ie(k.target.value), required: !0 })
             ] }),
             /* @__PURE__ */ i.jsx(de, { name: "note", label: "备注（可选）", defaultValue: d?.note }),
             /* @__PURE__ */ i.jsxs("label", { className: "exception-toggle full", children: [
@@ -13089,7 +13094,7 @@ function ig({ pending: c, students: f, preset: d, aiDraft: o, preview: E, busy: 
                   value: V,
                   onChange: (k) => {
                     const F = f.find((re) => re.name === k.target.value);
-                    ce(k.target.value), F && ne(F.default_duration);
+                    ce(k.target.value), F && ie(F.default_duration);
                   },
                   children: [
                     /* @__PURE__ */ i.jsx("option", { value: "", disabled: !0, children: "选择在读学生" }),
@@ -13107,7 +13112,7 @@ function ig({ pending: c, students: f, preset: d, aiDraft: o, preview: E, busy: 
             /* @__PURE__ */ i.jsx(de, { name: "time", label: "预留时间", type: "time", defaultValue: d?.time, required: !0 }),
             /* @__PURE__ */ i.jsxs("label", { className: "field", children: [
               /* @__PURE__ */ i.jsx("span", { children: "时长" }),
-              /* @__PURE__ */ i.jsx("input", { name: "duration", type: "number", min: "1", max: "480", value: le, onChange: (k) => ne(k.target.value) })
+              /* @__PURE__ */ i.jsx("input", { name: "duration", type: "number", min: "1", max: "480", value: ne, onChange: (k) => ie(k.target.value) })
             ] }),
             /* @__PURE__ */ i.jsx(de, { name: "zone", label: "片区（可选）", defaultValue: d?.zone }),
             /* @__PURE__ */ i.jsx(de, { name: "note", label: "备注（可选）", defaultValue: d?.note }),
@@ -13462,7 +13467,7 @@ function sg({ initialDraft: c, preview: f, busy: d, onPreview: o, onCommit: E, o
     "给叶梓程下周三下午预留一节 45 分钟的课",
     "取消董同学周日 13:40 的课，家长请假",
     "周三晚上八点提醒我抢补牙复查号"
-  ], [U, A] = w.useState([N]), [S, Y] = w.useState(""), [Q, ve] = w.useState(!1), [V, ce] = w.useState(""), [le, ne] = w.useState([]), [$, Ne] = w.useState(!1), pe = w.useRef(null), Z = typeof window < "u" && !!(window.webkitSpeechRecognition || window.SpeechRecognition);
+  ], [U, A] = w.useState([N]), [S, Y] = w.useState(""), [Q, ve] = w.useState(!1), [V, ce] = w.useState(""), [ne, ie] = w.useState([]), [$, Ne] = w.useState(!1), pe = w.useRef(null), Z = typeof window < "u" && !!(window.webkitSpeechRecognition || window.SpeechRecognition);
   function k() {
     const ae = window.webkitSpeechRecognition || window.SpeechRecognition;
     if (!ae) return;
@@ -13481,13 +13486,13 @@ function sg({ initialDraft: c, preview: f, busy: d, onPreview: o, onCommit: E, o
     c.nonce && (F.current.invalidate(), ve(!1), Y(c.text));
   }, [c.nonce, c.text]);
   function re() {
-    F.current.invalidate(), ve(!1), A([N]), Y(""), ce(""), ne([]), p();
+    F.current.invalidate(), ve(!1), A([N]), Y(""), ce(""), ie([]), p();
   }
   async function J(ae) {
     const be = (ae ?? S).trim();
     if (!be || Q) return;
     const De = F.current.begin(), Oe = U.slice(-10);
-    A((g) => [...g, { role: "user", text: be }]), Y(""), ne([]), ve(!0), ce(""), p();
+    A((g) => [...g, { role: "user", text: be }]), Y(""), ie([]), ve(!0), ce(""), p();
     try {
       const g = await lt("api/ai/interpret", {
         method: "POST",
@@ -13496,7 +13501,7 @@ function sg({ initialDraft: c, preview: f, busy: d, onPreview: o, onCommit: E, o
       });
       if (!F.current.isCurrent(De)) return;
       if (!g.ok) throw new Error(g.error || "AI 没有生成方案");
-      ne(g.status === "need_clarification" ? g.options ?? [] : []), A((B) => [...B, { role: "assistant", text: g.reply || "方案已经生成，请检查右侧预演。" }]), g.status === "ready" && g.batch && g.previews?.length ? o({
+      ie(g.status === "need_clarification" ? g.options ?? [] : []), A((B) => [...B, { role: "assistant", text: g.reply || "方案已经生成，请检查右侧预演。" }]), g.status === "ready" && g.batch && g.previews?.length ? o({
         ok: !0,
         batch: !0,
         summary: g.reply,
@@ -13538,7 +13543,7 @@ function sg({ initialDraft: c, preview: f, busy: d, onPreview: o, onCommit: E, o
           Q && /* @__PURE__ */ i.jsx("div", { className: "ai-bubble assistant thinking", children: "正在读取课表、预留、可用时间和通勤信息…" })
         ] }),
         V && /* @__PURE__ */ i.jsx(Dl, { tone: "error", title: "没有生成方案", text: V }),
-        le.length > 0 && /* @__PURE__ */ i.jsx("div", { className: "ai-option-row", role: "group", "aria-label": "快捷回答", children: le.map((ae) => /* @__PURE__ */ i.jsx("button", { type: "button", onClick: () => {
+        ne.length > 0 && /* @__PURE__ */ i.jsx("div", { className: "ai-option-row", role: "group", "aria-label": "快捷回答", children: ne.map((ae) => /* @__PURE__ */ i.jsx("button", { type: "button", onClick: () => {
           J(ae);
         }, children: ae }, ae)) }),
         /* @__PURE__ */ i.jsxs("div", { className: "ai-composer workspace-composer", children: [

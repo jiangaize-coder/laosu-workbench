@@ -72,7 +72,10 @@ test('manual refresh stays non-blocking, deduplicated and preserves current data
   assert.match(panel, /inert=\{loading && Boolean\(dashboard\)\}/);
   assert.match(panel, /const \[refreshing, setRefreshing\] = useState\(false\)/);
   assert.match(panel, /if \(!silent && manualRefreshRef\.current\) return/);
-  assert.match(panel, /silent: true, fresh: !silent, preserveOnError: !silent/);
+  assert.match(panel, /refreshCurrent\(\{ silent: true, fresh: true \}\)/);
+  assert.match(panel, /if \(refreshed === true\) dataRevisionRef\.current = res\.revision/);
+  assert.match(panel, /fresh: options\.fresh \?\? !silent/);
+  assert.match(panel, /preserveOnError: options\.preserveOnError \?\? !silent/);
   assert.match(panel, /aria-busy=\{refreshing\} disabled=\{loading \|\| refreshing\}/);
   assert.match(panel, /刷新未完成，已保留当前数据/);
   assert.match(css, /refresh-local-button\[aria-busy="true"\]/);

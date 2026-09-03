@@ -816,8 +816,8 @@ function Panel() {
           return;
         }
         if (res.revision !== dataRevisionRef.current) {
-          dataRevisionRef.current = res.revision;
-          void refreshCurrent({ silent: true });
+          const refreshed = await refreshCurrent({ silent: true, fresh: true });
+          if (refreshed === true) dataRevisionRef.current = res.revision;
         }
       } catch {
         // 轮询失败静默忽略。
@@ -988,7 +988,7 @@ function Panel() {
     }
   }
 
-  async function refreshCurrent(options: { silent?: boolean } = {}) {
+  async function refreshCurrent(options: { silent?: boolean; fresh?: boolean; preserveOnError?: boolean } = {}) {
     const silent = options.silent === true;
     if (!silent && manualRefreshRef.current) return;
     if (!silent) {
@@ -998,7 +998,12 @@ function Panel() {
     }
     try {
       // 手动刷新保持现有页面可用，只让刷新按钮进入忙碌态；fresh=1 重新读取底层脚本。
-      const ok = await loadDashboard(scope, { ...options, silent: true, fresh: !silent, preserveOnError: !silent });
+      const ok = await loadDashboard(scope, {
+        ...options,
+        silent: true,
+        fresh: options.fresh ?? !silent,
+        preserveOnError: options.preserveOnError ?? !silent,
+      });
       if (ok === true) {
         setAffairFeedback({});
         setDayCompleteFeedback(null);
@@ -1009,6 +1014,7 @@ function Panel() {
       } else if (ok === null && !silent) {
         setToast('视图已切换，当前页面正在读取最新数据');
       }
+      return ok;
     } finally {
       if (!silent) {
         manualRefreshRef.current = false;
