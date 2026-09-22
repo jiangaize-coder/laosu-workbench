@@ -175,9 +175,9 @@ HanaAgent 全屏插件。前端只读展示课程与事务，所有排课、调�
 ## 本机依赖
 
 - Python 3
-- `/Users/laosu/Desktop/laosu-workspace/10-knowledge/sjk-2026/苏据库/库管理与索引/老苏排课系统/schedule.py`
-- `/Users/laosu/Shared/Hana主动式事务系统/affairs.py`
-- `/Users/laosu/Desktop/laosu-workspace/10-knowledge/sjk-2026/苏据库/库管理与索引/老苏排课系统/sync_to_calendar.py`
+- `~/laosu-workspace/苏据库/库管理与索引/老苏排课系统/schedule.py`
+- `~/Shared/Hana主动式事务系统/affairs.py`
+- `~/laosu-workspace/苏据库/库管理与索引/老苏排课系统/sync_to_calendar.py`
 
 以上路径可通过环境变量覆盖：`LAOSU_SCHEDULE_SCRIPT`、`LAOSU_AFFAIRS_SCRIPT`、`LAOSU_CALENDAR_SYNC_SCRIPT`；首次使用对应能力时会校验脚本路径并返回明确错误。
 
